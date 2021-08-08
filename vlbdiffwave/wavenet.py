@@ -67,7 +67,7 @@ class WaveNet(nn.Module):
         self.upsample = [
             nn.ConvTranspose(
                 1,
-                config.upsample_kernel,
+                config.upsample_kernels,
                 config.upsample_strides,
                 padding='SAME')
             for _ in range(config.upsample_layers)]
