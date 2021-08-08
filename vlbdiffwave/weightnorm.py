@@ -48,8 +48,8 @@ class WNDilatedConv(nn.Module):
             norm * kernel / kernel_norm,
             window_strides=[1],
             padding='SAME',
-            lhs_dilation=[self.dilations],  # = strides of transposed conv
-            rhs_dilation=[self.dilations],  # = atrous conv = dilated conv
+            lhs_dilation=[self.lhs_dilations],  # = strides of transposed conv
+            rhs_dilation=[self.rhs_dilations],  # = atrous conv = dilated conv
             dimension_numbers=nn.linear._conv_dimension_numbers(inputs.shape))
         if self.use_bias:
             bias = self.param('bias', self.bias_init, [self.channels])
