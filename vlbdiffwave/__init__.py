@@ -4,7 +4,7 @@ import flax
 import numpy as np
 
 from .config import Config
-from .wavenet import WaveNet
+from .impl import Denoiser
 
 
 class VLBDiffWave:
@@ -16,7 +16,7 @@ class VLBDiffWave:
             config: model configuration.
         """
         self.config = config
-        self.wavenet = WaveNet(config=config)
+        self.denoiser = Denoiser(config=config)
         self.param = None
 
     def init(self, key: np.ndarray):
@@ -28,10 +28,10 @@ class VLBDiffWave:
         """
         # placeholders
         signal = jnp.zeros([1, self.config.hop])
-        snr = jnp.zeros([1])
+        time = jnp.zeros([1])
         mel = jnp.zeros([1, 1, 80])
         # initialize
-        self.param = wavenet.init(key, signal, snr, mel)
+        self.param = self.denoiser.init(key, signal, time, mel)
 
     def write(self, path: str):
         """Write model checkpoints.
