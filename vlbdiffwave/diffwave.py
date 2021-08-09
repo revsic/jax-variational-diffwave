@@ -3,6 +3,7 @@ import jax.numpy as jnp
 
 from .config import Config
 from .wavenet import WaveNetBlock
+from .weightnorm import constant
 
 
 class DiffWave(nn.Module):
@@ -20,6 +21,8 @@ class DiffWave(nn.Module):
         self.proj_embed = [
             nn.Dense(config.embedding_proj)
             for _ in range(config.embedding_layers)]
+        self.embedding_factor = self.param(
+            'embedding_factor', constant(float(config.embedding_factor)), [])
         # mel-upsampler
         self.upsample = [
             nn.ConvTranspose(
@@ -89,7 +92,7 @@ class DiffWave(nn.Module):
         # [E // 2]
         denom = jnp.exp(-jnp.log(10000) * i / self.config.embedding_size)
         # [B, E // 2]
-        context = snr[:, None] * denom[None] * self.config.embedding_factor
+        context = snr[:, None] * denom[None] * self.embedding_factor
         # [B, E // 2, 2]
         pe = jnp.stack([jnp.sin(context), jnp.cos(context)], axis=-1)
         # [B, E]
