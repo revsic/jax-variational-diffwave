@@ -25,3 +25,6 @@ class Config:
         self.dilations = 2
         self.num_layers = 10
         self.num_cycles = 3
+
+        # learned scheduler
+        self.internal = 1024
