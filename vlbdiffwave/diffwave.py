@@ -51,7 +51,7 @@ class DiffWave(nn.Module):
             snr: [float32; [B]], normalized signal-to-noise ratio.
             mel: [float32; [B, T // H, M]], mel-spectrogram.
         Returns:
-            [float32; [B, T]], denoised signal.
+            [float32; [B, T]], estimated noise.
         """
         # [B, T, C]
         x = nn.swish(self.proj(signal[..., None]))
