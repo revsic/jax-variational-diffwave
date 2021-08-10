@@ -6,7 +6,7 @@ import flax
 import numpy as np
 
 from .config import Config
-from .impl import Denoiser
+from .impl import Model
 
 
 class VLBDiffWave:
@@ -18,7 +18,7 @@ class VLBDiffWave:
             config: model configuration.
         """
         self.config = config
-        self.denoiser = Denoiser(config=config)
+        self.model = Model(config=config)
         self.param = None
 
     def __call__(self,
@@ -49,7 +49,7 @@ class VLBDiffWave:
         # []
         for time in timesteps:
             # [B, T]
-            _, signal = self.denoiser.apply(self.param, signal, time, mel)
+            _, signal = self.model.apply(self.param, signal, time, mel)
             # save intermediate representations
             ir.append(signal)
         # [B, T]
@@ -67,7 +67,7 @@ class VLBDiffWave:
         time = jnp.zeros([1])
         mel = jnp.zeros([1, 1, 80])
         # initialize
-        self.param = self.denoiser.init(key, signal, time, mel)
+        self.param = self.model.init(key, signal, time, mel)
 
     def write(self, path: str):
         """Write model checkpoints.
