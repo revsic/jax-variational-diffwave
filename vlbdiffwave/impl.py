@@ -37,7 +37,7 @@ class Model(nn.Module):
     def __call__(self,
                  signal: jnp.ndarray,
                  time: jnp.ndarray,
-                 mel: jnp.ndarray) -> jnp.ndarray:
+                 mel: jnp.ndarray) -> Tuple[jnp.ndarray, jnp.ndarray]:
         """Denoise signal w.r.t timestep on mel-condition.
         Args:
             signal: [float32; [B, T]], noised signal.
