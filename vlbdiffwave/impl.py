@@ -1,4 +1,4 @@
-from typing import Tuple
+from typing import Optional, Tuple
 
 import flax.linen as nn
 import jax.numpy as jnp
@@ -8,8 +8,8 @@ from .diffwave import DiffWave
 from .logsnr import LogSNR
 
 
-class Denoiser(nn.Module):
-    """Model definition
+class Model(nn.Module):
+    """Model definition of VLB-Diffwave.
     """
     config: Config
 
@@ -58,25 +58,31 @@ class Denoiser(nn.Module):
                   signal: jnp.ndarray,
                   noise: jnp.ndarray,
                   s: jnp.ndarray,
-                  t: jnp.ndarray) -> jnp.ndarray:
-        """Add noise to the signal.
+                  t: Optional[jnp.ndarray] = None) -> jnp.ndarray:
+        """Add noise to signal.
         Args:
             signal: [float32; [B, T]], input signal.
             noise: [float32; [B, T]], gaussian noise.
             s: [float32; [B]], start time in range[0, 1].
             t: [float32; [B]], target time in range[0, 1], s < t.
+                if t is None, compute q(z_t|x), otherwise, q(z_t|z_s).
+        Returns:
+            [float32; [B, T]], noised signal.
         """
         # B
         bsize = s.shape[0]
-        # [B + B]
-        time = jnp.concatenate([s, t], axis=0)
-        # [B + B] x 4
-        _, _, alpha, sigma = self.denoiser.logsnr.snr(time)
-        # [B]
-        alpha_s, alpha_t = alpha[:bsize], alpha[bsize:]
-        sigma_s, sigma_t = sigma[:bsize], sigma[bsize:]
-        # [B]
-        alpha_tbars = alpha_t / alpha_s
-        sigma_tbars = jnp.sqrt(sigma_t ** 2 - alpha_tbars * sigma_s ** 2)
+        # [B']
+        time = s if t is None else jnp.concatenate([s, t], axis=0)
+        # [B'] x 4
+        _, _, alpha, sigma = self.snr(time)
+        if t is None:
+            # [B]
+            alpha_s, alpha_t = alpha[:bsize], alpha[bsize:]
+            sigma_s, sigma_t = sigma[:bsize], sigma[bsize:]
+            # [B]
+            alpha_tbars = alpha_t / alpha_s
+            sigma_tbars = jnp.sqrt(sigma_t ** 2 - alpha_tbars * sigma_s ** 2)
+            # [B]
+            alpha, sigma = alpha_tbars, sigma_tbars
         # [B, T]
-        return alpha_tbars * signal + sigma_tbars * noise
+        return alpha * signal + sigma * noise
