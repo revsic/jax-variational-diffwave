@@ -1,3 +1,5 @@
+from typing import Tuple
+
 import flax.linen as nn
 import jax.numpy as jnp
 
@@ -26,7 +28,7 @@ class WaveNetBlock(nn.Module):
     def __call__(self,
                  inputs: jnp.ndarray,
                  embedding: jnp.ndarray,
-                 mel: jnp.ndarray) -> jnp.ndarray:
+                 mel: jnp.ndarray) -> Tuple[jnp.ndarray, jnp.ndarray]:
         """Pass to wavenet block.
         Args:
             inputs: [float32; [B, T, C]], input tensor.
