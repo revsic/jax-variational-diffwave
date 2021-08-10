@@ -1,3 +1,5 @@
+from typing import List, Optional, Tuple
+
 import jax
 import jax.numpy as jnp
 import flax
@@ -18,6 +20,40 @@ class VLBDiffWave:
         self.config = config
         self.denoiser = Denoiser(config=config)
         self.param = None
+
+    def __call__(self,
+                 mel: jnp.ndarray,
+                 timesteps: jnp.ndarray,
+                 key: Optional[jnp.ndarray] = None,
+                 noise: Optional[jnp.ndarray] = None) -> \
+            Tuple[jnp.ndarray, List[jnp.ndarray]]:
+        """Generate audio from mel-spectrogram.
+        Args:
+            mel: [float32; [B, T // H, M]], condition mel-spectrogram.
+            timesteps: [float32; [S]], time steps.
+            key: jax random prng key.
+            noise: [float32; [B, T]], starting noise.
+                neither key nor noise should be None.
+        Returns:
+            [float32; [B, T]], generated audio and intermediate representations.
+        """
+        # assertion
+        assert key is not None or noise is not None
+        if noise is None:
+            # B, T // H, _
+            bsize, mellen, _ = mel.shape
+            # [B, T]
+            noise = jnp.random.normal(key, shape=(bsize, mellen * self.config.hop))
+        # initilize
+        ir, signal = [noise], noise
+        # []
+        for time in timesteps:
+            # [B, T]
+            _, signal = self.denoiser(signal, time, mel)
+            # save intermediate representations
+            ir.append(signal)
+        # [B, T]
+        return signal, ir
 
     def init(self, key: np.ndarray):
         """Initialize model parameters.
