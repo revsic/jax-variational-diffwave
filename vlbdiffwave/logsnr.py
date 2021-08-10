@@ -1,4 +1,4 @@
-from typing import Callable
+from typing import Callable, Tuple
 
 import flax.linen as nn
 import jax.numpy as jnp
@@ -60,13 +60,12 @@ class LogSNR(nn.Module):
         self.proj2 = PosDense(channels=self.internal)
         self.proj3 = PosDense(channels=1)
 
-    def __call__(self, inputs: jnp.ndarray) -> jnp.ndarray:
+    def __call__(self, inputs: jnp.ndarray) -> Tuple[jnp.ndarray, jnp.ndarray]:
         """Compute logSNR from continuous timesteps.
         Args:
             inputs: [float32; [B]], timesteps in [0, 1].
         Returns:
-            [float32; [B]], logSNR.
-            [float32; [B]], normalized -logSNR in [0, 1].
+            [float32; [B]], logSNR and normalized -logSNR.
         """
         # [B + 2], add terminal point
         x = jnp.concatenate([[0., 1.], inputs], axis=0) 
