@@ -49,7 +49,7 @@ class VLBDiffWave:
         # []
         for time in timesteps:
             # [B, T]
-            _, signal = self.denoiser(signal, time, mel)
+            _, signal = self.denoiser.apply(self.param, signal, time, mel)
             # save intermediate representations
             ir.append(signal)
         # [B, T]
