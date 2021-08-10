@@ -1,7 +1,6 @@
 import flax.linen as nn
 import jax.numpy as jnp
 
-from .config import Config
 from .weightnorm import WNDilatedConv, WNDense
 
 
