@@ -1,5 +1,6 @@
 from typing import Optional, Tuple
 
+import flax
 import flax.linen as nn
 import jax.numpy as jnp
 
@@ -8,38 +9,58 @@ from .diffwave import DiffWave
 from .logsnr import LogSNR
 
 
-class Model(nn.Module):
+class VLBDiffWave:
     """Model definition of VLB-Diffwave.
     """
-    config: Config
-
-    def setup(self):
-        """Initialize models.
+    def __init__(self, config: Config):
+        """Initializer.
+        Args:
+            config: model configuration.
         """
-        self.diffwave = DiffWave(config=self.config)
-        self.logsnr = LogSNR(internal=self.config.internal)
-    
-    def snr(self, time: jnp.ndarray) -> \
+        self.diffwave = DiffWave(config=config)
+        self.logsnr = LogSNR(internal=config.internal)
+
+    def init(self,
+             key: jnp.ndarray,
+             signal: jnp.ndarray,
+             aux: jnp.ndarray,
+             mel: jnp.ndarray) -> flax.core.frozen_dict.FrozenDict:
+        """Initialize model parameters.
+        Args:
+            signal: [float32; [B, T]], noise signal.
+            aux: [float32; [B]], timestep for logsnr, logSNR for diffwave.
+            mel: [float32; [B, T // H, M]], mel-spectrogram.
+        Returns:
+            model parameters.
+        """
+        lparam = self.logsnr.init(key, aux)
+        dparam = self.diffwave.init(key, signal, aux, mel)
+        return flax.core.freeze({'diffwave': dparam, 'logsnr': lparam})
+
+    def snr(self, param: flax.core.frozen_dict.FrozenDict, time: jnp.ndarray) -> \
             Tuple[jnp.ndarray, jnp.ndarray, jnp.ndarray, jnp.ndarray]:
         """Compute SNR and alpha, sigma.
         Args:
+            param: parameters of LogSNR.
             time: [float32; [B]], current timestep.
         Returns:
             [float32; [B]], logSNR, normalized -logSNR, alpha and sigma.
         """
         # [B], [B]
-        logsnr, norm_nlogsnr = self.logsnr(time)
+        logsnr, norm_nlogsnr = self.logsnr.apply(param, time)
         # [B]
         alpha = jnp.sqrt(jnp.maximum(nn.sigmoid(logsnr), 1e-5))
         sigma = jnp.sqrt(jnp.maximum(nn.sigmoid(-logsnr), 1e-5))
         return logsnr, norm_nlogsnr, alpha, sigma
 
     def __call__(self,
+                 param: flax.core.frozen_dict.FrozenDict,
                  signal: jnp.ndarray,
                  time: jnp.ndarray,
                  mel: jnp.ndarray) -> Tuple[jnp.ndarray, jnp.ndarray]:
         """Denoise signal w.r.t timestep on mel-condition.
         Args:
+            param: model parameters.
             signal: [float32; [B, T]], noised signal.
             timestep: [float32; [B]], current timestep.
             mel: [float32; [B, T // H, M]], mel-spectrogram.
@@ -47,20 +68,22 @@ class Model(nn.Module):
             [float32; [B, T]], noise and denoised signal.
         """
         # [B] x 4
-        _, norm_nlogsnr, alpha, sigma = self.snr(time)
+        _, norm_nlogsnr, alpha, sigma = self.snr(param['logsnr'], time)
         # [B, T]
-        noise = self.diffwave(signal, norm_nlogsnr, mel)
+        noise = self.diffwave.apply(param['diffwave'], signal, norm_nlogsnr, mel)
         # [B, T]
         denoised = (signal - sigma * noise) / alpha        
         return noise, denoised
 
     def diffusion(self,
+                  param: flax.core.frozen_dict.FrozenDict,
                   signal: jnp.ndarray,
                   noise: jnp.ndarray,
                   s: jnp.ndarray,
                   t: Optional[jnp.ndarray] = None) -> jnp.ndarray:
         """Add noise to signal.
         Args:
+            param: model parameters.
             signal: [float32; [B, T]], input signal.
             noise: [float32; [B, T]], gaussian noise.
             s: [float32; [B]], start time in range[0, 1].
@@ -74,7 +97,7 @@ class Model(nn.Module):
         # [B']
         time = s if t is None else jnp.concatenate([s, t], axis=0)
         # [B'] x 4
-        _, _, alpha, sigma = self.snr(time)
+        _, _, alpha, sigma = self.snr(param['logsnr'], time)
         if t is None:
             # [B]
             alpha_s, alpha_t = alpha[:bsize], alpha[bsize:]
