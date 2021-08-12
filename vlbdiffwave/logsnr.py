@@ -68,6 +68,7 @@ class LogSNR(nn.Module):
             value: value to put.
         """
         self.memory.value = value
+        return value
     
     def get(self) -> jnp.ndarray:
         """Get value from memory.
