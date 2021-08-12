@@ -6,11 +6,11 @@ import flax
 import numpy as np
 
 from .config import Config
-from .impl import Model
+from .impl import VLBDiffWave
 
 
-class VLBDiffWave:
-    """VLB-DiffWave: Variational Diffusion for Audio Synthesis.
+class VLBDiffWaveApp:
+    """Application for vlb-diffwave.
     """
     def __init__(self, config: Config):
         """Initializer.
@@ -18,7 +18,7 @@ class VLBDiffWave:
             config: model configuration.
         """
         self.config = config
-        self.model = Model(config=config)
+        self.model = VLBDiffWave(config)
         self.param = None
 
     def __call__(self,
