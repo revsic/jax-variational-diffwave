@@ -60,7 +60,7 @@ class LogSNR(nn.Module):
         self.proj2 = PosDense(channels=self.internal)
         self.proj3 = PosDense(channels=1)
         # memory
-        self.memory = self.variable('memory', 'loss', jnp.zeros, [])
+        self.memory = self.variable('memory', 'loss', jnp.ones, [])
 
     def put(self, value: jnp.ndarray):
         """Put value to the memory.
