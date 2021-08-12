@@ -71,7 +71,7 @@ hooked_logsnr.defvjp(fwd_logsnr, bwd_logsnr)
 
 
 @functools.partial(jax.custom_vjp, nondiff_argnums=(0, 1))
-def hook_pipeline(fn: Callable, pipeline: Pipeline, *args) -> Any:
+def hooked_pipeline(fn: Callable, pipeline: Pipeline, *args) -> Any:
     """Save result of `fn` to the pipeline.
     Args:
         fn: target function.
@@ -112,4 +112,4 @@ def bwd_pipeline(_: Callable, _: Pipeline, vjp: Callable, cot: jnp.ndarray) -> A
     return vjp(cot)
 
 # define vjp
-hook_pipeline.defvjp(fwd_pipeline, bwd_pipeline)
+hooked_pipeline.defvjp(fwd_pipeline, bwd_pipeline)
