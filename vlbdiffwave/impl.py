@@ -53,7 +53,7 @@ class VLBDiffWave:
         sigma = jnp.sqrt(jnp.maximum(nn.sigmoid(-logsnr), 1e-5))
         return logsnr, norm_nlogsnr, alpha, sigma
 
-    def __call__(self,
+    def apply(self,
                  param: flax.core.frozen_dict.FrozenDict,
                  signal: jnp.ndarray,
                  time: jnp.ndarray,
