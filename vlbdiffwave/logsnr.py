@@ -59,6 +59,8 @@ class LogSNR(nn.Module):
         self.proj1 = PosDense(channels=1)
         self.proj2 = PosDense(channels=self.internal)
         self.proj3 = PosDense(channels=1)
+        # memory
+        self.memory = self.variable('memory', 'loss', jnp.zeros, [])
 
     def __call__(self, inputs: jnp.ndarray) -> Tuple[jnp.ndarray, jnp.ndarray]:
         """Compute logSNR from continuous timesteps.
