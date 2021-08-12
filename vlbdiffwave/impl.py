@@ -8,7 +8,6 @@ from .config import Config
 from .diffwave import DiffWave
 from .hook import hooked_logsnr
 from .logsnr import LogSNR
-from .pipeline import Pipeline
 
 
 class VLBDiffWave:
@@ -19,7 +18,6 @@ class VLBDiffWave:
         Args:
             config: model configuration.
         """
-        self.pipeline = Pipeline()
         self.diffwave = DiffWave(config=config)
         self.logsnr = LogSNR(internal=config.internal)
 
@@ -50,7 +48,7 @@ class VLBDiffWave:
             [float32; [B]], logSNR, normalized -logSNR, alpha and sigma.
         """
         # [B], [B]
-        logsnr, norm_nlogsnr = hooked_logsnr(self.logsnr, self.pipeline, param, time)
+        logsnr, norm_nlogsnr = hooked_logsnr(self.logsnr, param, time)
         # [B]
         alpha = jnp.sqrt(jnp.maximum(nn.sigmoid(logsnr), 1e-5))
         sigma = jnp.sqrt(jnp.maximum(nn.sigmoid(-logsnr), 1e-5))
