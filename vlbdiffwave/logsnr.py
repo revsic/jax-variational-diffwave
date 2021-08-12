@@ -62,6 +62,20 @@ class LogSNR(nn.Module):
         # memory
         self.memory = self.variable('memory', 'loss', jnp.zeros, [])
 
+    def put(self, value: jnp.ndarray):
+        """Put value to the memory.
+        Args:
+            value: value to put.
+        """
+        self.memory.value = value
+    
+    def get(self) -> jnp.ndarray:
+        """Get value from memory.
+        Returns:
+            value from memory.
+        """
+        return self.memory.value
+
     def __call__(self, inputs: jnp.ndarray) -> Tuple[jnp.ndarray, jnp.ndarray]:
         """Compute logSNR from continuous timesteps.
         Args:
