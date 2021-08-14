@@ -51,12 +51,9 @@ class TrainWrapper:
         # []
         loss = loss.mean()
         # set loss to the memory
-        _, updated_state = model.logsnr.apply(
-            params['logsnr'], loss,
-            method=model.logsnr.put, mutable=['memory'])
-        return loss, updated_state
+        model.logsnr.pipeline.memory = loss
+        return loss
 
-    @jax.jit
     def gradient(self,
                  params: flax.core.frozen_dict.FrozenDict,
                  signal: jnp.ndarray,
