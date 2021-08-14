@@ -29,6 +29,9 @@ class TrainConfig:
         self.eval_intval = 5000
         self.ckpt_intval = 10000
 
+        # commit hash
+        self.hash = 'unknown'
+
 
 class Config:
     """Integrated configuration.
