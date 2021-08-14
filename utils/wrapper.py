@@ -73,6 +73,5 @@ class TrainWrapper:
             grads: gradients for each parameters.
         """
         # [], FrozenDict
-        (loss, updated_state), grads = jax.value_and_grad(
-            self.compute_loss, has_aux=True)(params, signal, noise, timestep, mel)
-        return loss, updated_state, grads
+        return jax.value_and_grad(self.compute_loss)(
+            params, signal, noise, timestep, mel)
