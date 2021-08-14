@@ -4,18 +4,18 @@ import flax
 import jax
 import jax.numpy as jnp
 
-from vlbdiffwave import VLBDiffWaveApp
+from vlbdiffwave.impl import VLBDiffWave
 
 
 class TrainWrapper:
     """Train-wrapper for vlb-diffwave.
     """
-    def __init__(self, diffwave: VLBDiffWaveApp):
+    def __init__(self, diffwave: VLBDiffWave):
         """Initializer.
         Args:
             diffwave: Target model.
         """
-        self.diffwave = diffwave
+        self.model = diffwave
 
     def compute_loss(self,
                      params: flax.core.frozen_dict.FrozenDict,
@@ -33,17 +33,16 @@ class TrainWrapper:
         Returns:
             [float32; []], loss value.
         """
-        model = self.diffwave.model
         # [B, T]
-        diffusion = model.diffusion(params, signal, noise, timestep)
+        diffusion = self.model.diffusion(params, signal, noise, timestep)
         # [B, T]
-        estim, _ = model.apply(params, diffusion, timestep, mel)
+        estim, _ = self.model.apply(params, diffusion, timestep, mel)
         # [B]
         mse = jnp.square(noise - estim).sum(axis=-1)
         # [B], dlog-SNR/dt
         dlogsnr, _ = jax.grad(
             # lifting
-            lambda t: model.logsnr.apply(params['logsnr'], t),
+            lambda t: self.model.logsnr.apply(params['logsnr'], t),
             # compute gradient only on log-SNR w.r.t. timestep
             argnums=1, has_aux=True)(timestep)
         # [B]
@@ -51,7 +50,7 @@ class TrainWrapper:
         # []
         loss = loss.mean()
         # set loss to the memory
-        model.logsnr.pipeline.memory = loss
+        self.model.logsnr.pipeline.memory = loss
         return loss
 
     def gradient(self,
