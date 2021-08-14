@@ -26,9 +26,7 @@ def hooked_logsnr(logsnr: LogSNR,
 def fwd_logsnr(logsnr: LogSNR,
                param: flax.core.frozen_dict.FrozenDict,
                time: jnp.ndarray) -> \
-        Tuple[
-            Tuple[jnp.ndarray, jnp.ndarray],
-            Tuple[Callable, flax.core.frozen_dict.FrozenDict]]:
+        Tuple[Tuple[jnp.ndarray, jnp.ndarray], Callable]:
     """Forward function of hooked-logsnr.
     Args:
         logsnr: model of LogSNR.
@@ -37,28 +35,25 @@ def fwd_logsnr(logsnr: LogSNR,
     Returns:
         out: [float32; [B]], log-SNR and normalized -logSNR.
         vjp: vjp function of `logsnr.apply`.
-        param: model parameters for residual computation.
     """
     # ([B], [B]), Callable
-    out, jvp = jax.vjp(logsnr.apply, param, time)
-    return out, (jvp, param)
+    return jax.vjp(logsnr.apply, param, time)
 
 
 def bwd_logsnr(logsnr: LogSNR,
-               res: Tuple[Callable, flax.core.frozen_dict.FrozenDict],
+               vjp: Callable,
                cot: Tuple[jnp.ndarray, jnp.ndarray]) -> \
         Tuple[flax.core.frozen_dict.FrozenDict, jnp.ndarray]:
     """Backward pass.
     Args:
         _: model of LogSNR.
-        res: vjp function and parameters.
+        vjp: vjp function.
         cot: cotangent value of two outputs of `logsnr.apply`.
     """
-    vjp, param = res
     # flax.core.frozen_dict.FrozenDict, jnp.ndarray
     cot_param, cot_time = vjp(cot)
     # get loss
-    loss = logsnr.apply(param, method=logsnr.get)
+    loss = logsnr.pipeline.memory
     # add MC variance regularizer
     cot_param = jax.tree_map(lambda p: 2 * loss * p, cot_param)
     # do not touch contangent of time
