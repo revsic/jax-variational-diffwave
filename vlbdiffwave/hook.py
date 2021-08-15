@@ -54,10 +54,17 @@ def bwd_logsnr(logsnr: LogSNR,
     cot_param, cot_time = vjp(cot)
     # get loss
     loss = logsnr.memory
+    # split parameters
+    endp, interp = {}, {}
+    for key, val in cot_param['params'].items():
+        if key.startswith('gamma'):
+            endp[key] = val
+        else:
+            interp[key] = val
     # add MC variance regularizer
-    cot_param = jax.tree_map(lambda p: 2 * loss * p, cot_param)
+    cot_param = jax.tree_map(lambda p: 2 * loss * p, interp)
     # do not touch contangent of time
-    return cot_param, cot_time
+    return {'params': {**endp, **interp}}, cot_time
 
 # define vjp
 hooked_logsnr.defvjp(fwd_logsnr, bwd_logsnr)
