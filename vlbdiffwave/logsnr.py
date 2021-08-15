@@ -70,7 +70,7 @@ class LogSNR(nn.Module):
             [float32; [B]], logSNR and normalized -logSNR.
         """
         # [B + 2], add terminal point
-        x = jnp.concatenate([[0., 1.], inputs], axis=0) 
+        x = jnp.concatenate([jnp.array([0., 1.]), inputs], axis=0) 
         # [B + 2, 1]
         l1 = self.proj1(x[:, None])
         # [B + 2, C]
