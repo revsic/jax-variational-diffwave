@@ -51,10 +51,7 @@ class Trainer:
             config.train.beta1,
             config.train.beta2,
             config.train.eps)
-        self.optim_state = self.optim.init(self.model.param)
-
-        self.eval_intval = config.train.eval_intval // config.data.batch
-        self.ckpt_intval = config.train.ckpt_intval // config.data.batch
+        self.optim_state = self.optim.init(self.app.param)
 
         self.train_log = tf.summary.create_file_writer(
             os.path.join(config.train.log, config.train.name, 'train'))
@@ -66,17 +63,19 @@ class Trainer:
 
         self.cmap = plt.get_cmap('viridis').colors
         self.melfilter = librosa.filters.mel(
-            config.sr, config.fft, config.mel, config.fmin, config.fmax).T
+            config.data.sr, config.data.fft, config.data.mel,
+            config.data.fmin, config.data.fmax).T
 
     def train(self, key: jnp.ndarray, epoch: int = 0, timesteps: int = 10):
         """Train wavegrad.
         Args:
             epoch: int, starting step.
         """
-        step = epoch * self.trainsize
+        step = epoch * len(self.trainset)
         for epoch in tqdm.trange(epoch, self.config.train.epoch):
-            with tqdm.tqdm(total=self.trainsize, leave=False) as pbar:
-                for it, (mel, speech) in enumerate(self.trainset):
+            with tqdm.tqdm(total=len(self.trainset), leave=False) as pbar:
+                for mel, speech in self.trainset:
+                    self.wapper.reinit()
                     # split key
                     key, s1, s2 = jax.random.split(key, num=3)
                     # [B, T]
@@ -212,6 +211,9 @@ class Trainer:
 
 
 if __name__ == '__main__':
+    # disable tensorflow gpu
+    tf.config.set_visible_devices([], 'GPU')
+    # argument parser
     parser = argparse.ArgumentParser()
     parser.add_argument('--seed', default=0, type=int)
     parser.add_argument('--config', default=None)
