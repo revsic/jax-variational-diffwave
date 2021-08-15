@@ -34,7 +34,7 @@ class DatasetWrapper:
             Datasets.Iterator, iterator wrapper for audio random segmentation.
         """
         return DatasetWrapper.Iterator(
-            self.dataset.to_numpy_iterator(), self.segsize, self.hop)
+            self.dataset.as_numpy_iterator(), self.segsize, self.hop)
 
     class Iterator:
         """Iterator wrapper for audio random segmentation.
