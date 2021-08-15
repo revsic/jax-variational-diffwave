@@ -44,16 +44,15 @@ class VLBDiffWaveApp:
             # B, T // H, _
             bsize, mellen, _ = mel.shape
             # [B, T]
-            noise = jnp.random.normal(key, shape=(bsize, mellen * self.config.hop))
+            noise = jax.random.normal(key, shape=(bsize, mellen * self.config.hop))
         if isinstance(timesteps, int):
             # [S]
-            timesteps = jnp.linapce(1., 0., timesteps + 1)
+            timesteps = jnp.linspace(1., 0., timesteps + 1)
         # scanning
         reprs = self.inference(mel, timesteps, noise)
         # outputs and intermediate representations
         return reprs[-1], reprs
 
-    @jax.jit
     def inference(self, mel: jnp.ndarray, timesteps: jnp.ndarray, noise: jnp.ndarray) -> \
             Tuple[jnp.ndarray, List[jnp.ndarray]]:
         """Generate audio, just-in-time compiled.
