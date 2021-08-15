@@ -18,8 +18,7 @@ import tqdm
 from config import Config
 from speechset import VocoderDataset
 from speechset.datasets import LJSpeech
-from utils.datasets import Datasets
-from utils.wrapper import TrainWrapper
+from utils.wrapper import DatasetWrapper, TrainWrapper
 from vlbdiffwave import VLBDiffWaveApp
 
 
@@ -40,7 +39,7 @@ class Trainer:
         self.wrapper = TrainWrapper(self.app.model)
 
         trainset, testset = self.vocdata.dataset(config.train.split)
-        self.trainset = Datasets(trainset
+        self.trainset = DatasetWrapper(trainset
             .shuffle(config.train.bufsiz)
             .prefetch(tf.data.experimental.AUTOTUNE))
         self.testset = testset.prefetch(tf.data.experimental.AUTOTUNE)
@@ -114,12 +113,12 @@ class Trainer:
                             del pred
 
             self.app.write(
-                '{}_{}.ckpt'.format(self.ckpt_path, epoch), self.optim)
+                '{}_{}.ckpt'.format(self.ckpt_path, epoch), self.optim_state)
 
             loss = [
                 self.wrapper.compute_loss(
                     self.app.param, speech, noise, time, mel).item()
-                for mel, speech in Datasets(self.testset)
+                for mel, speech in DatasetWrapper(self.testset)
             ]
             loss = sum(loss) / len(loss)
             with self.test_log.as_default():
@@ -256,13 +255,13 @@ if __name__ == '__main__':
 
     # loading
     if args.load_epoch > 0:
-        super_path = os.path.join(config.train.ckpt, config.train.name)
-        ckpt_path = '{}_{}.ckpt'.format(config.train.name, args.load_epoch)
-        ckpt_path = next(
-            name for name in os.listdir(super_path)
-                 if name.startswith(ckpt_path) and name.endswith('.index'))
-        ckpt_path = os.path.join(super_path, ckpt_path[:-6])
-        
+        # find checkpoint
+        ckpt_path = os.path.join(
+            config.train.ckpt,
+            config.train.name,
+            f'{config.train.name}_{args.load_epoch}.ckpt')
+        # load checkpoint
+        diffwave.restore(ckpt_path, trainer.optim_state)
         print('[*] load checkpoint: ' + ckpt_path)
         # since epoch starts with 0
         args.load_epoch += 1
