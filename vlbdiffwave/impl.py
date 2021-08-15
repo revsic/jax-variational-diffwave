@@ -104,7 +104,7 @@ class VLBDiffWave:
             sigma_sq_s, sigma_sq_t = sigma_sq[:bsize], sigma_sq[bsize:]
             # [B]
             alpha_sq_tbars = alpha_sq_t / alpha_sq_s
-            sigma_sq_tbars = jnp.sqrt(sigma_sq_t - alpha_sq_tbars * sigma_sq_s)
+            sigma_sq_tbars = sigma_sq_t - alpha_sq_tbars * sigma_sq_s
             # [B]
             alpha_sq, sigma_sq = alpha_sq_tbars, sigma_sq_tbars
         # [B]
