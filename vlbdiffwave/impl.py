@@ -50,8 +50,7 @@ class VLBDiffWave:
         # [B], [B]
         logsnr, norm_nlogsnr = hooked_logsnr(self.logsnr, param, time)
         # [B]
-        alpha_sq = jnp.maximum(nn.sigmoid(logsnr))
-        sigma_sq = jnp.maximum(nn.sigmoid(-logsnr))
+        alpha_sq, sigma_sq = nn.sigmoid(logsnr), nn.sigmoid(-logsnr)
         return logsnr, norm_nlogsnr, alpha_sq, sigma_sq
 
     def apply(self,
@@ -93,10 +92,10 @@ class VLBDiffWave:
             [float32; [B, T]], denoised signal.
         """
         # [B, T], [B], [B]
-        noise, (alpha_sq, sigma_sq) = self.model.apply(param, signal, t, mel)
+        noise, (alpha_sq, sigma_sq) = self.apply(param, signal, mel, t)
         if s is not None:
             # [B] x 2
-            _, _, alpha_sq_s, sigma_sq_s = self.model.snr(param, s)
+            _, _, alpha_sq_s, sigma_sq_s = self.snr(param['logsnr'], s)
             # [B]
             alpha_sq_tbars = alpha_sq / alpha_sq_s
             sigma_sq_tbars = sigma_sq - alpha_sq_tbars * sigma_sq_s
