@@ -65,4 +65,4 @@ class DatasetWrapper:
             mel = np.stack([m[p:p + melseg] for m, p in zip(mel, pos)])
             # [B, S]
             speech = np.stack([s[p:p + self.segsize] for s, p in zip(speech, pos * self.hop)])
-            return mel, speech
+            return jnp.asarray(mel), jnp.asarray(speech)
