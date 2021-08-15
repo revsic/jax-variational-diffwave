@@ -40,8 +40,10 @@ class Trainer:
 
         trainset, testset = self.vocdata.dataset(config.train.split)
         self.trainset = DatasetWrapper(trainset
-            .shuffle(config.train.bufsiz)
-            .prefetch(tf.data.experimental.AUTOTUNE), self.config.train.segsize)
+                .shuffle(config.train.bufsiz)
+                .prefetch(tf.data.experimental.AUTOTUNE),
+            self.config.train.segsize,
+            self.config.data.hop)
         self.testset = testset.prefetch(tf.data.experimental.AUTOTUNE)
 
         self.optim = optax.adam(
@@ -115,12 +117,14 @@ class Trainer:
             self.app.write(
                 '{}_{}.ckpt'.format(self.ckpt_path, epoch), self.optim_state)
 
+            # evaluation loss
             loss = [
                 self.wrapper.compute_loss(
                     self.app.param, speech, noise, time, mel).item()
-                for mel, speech in DatasetWrapper(self.testset, self.config.train.segsize)
-            ]
+                for mel, speech in DatasetWrapper(
+                    self.testset, self.config.train.segsize, self.config.data.hop)]
             loss = sum(loss) / len(loss)
+            # test log
             with self.test_log.as_default():
                 tf.summary.scalar('loss', loss, step)
 
