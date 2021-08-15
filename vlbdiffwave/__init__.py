@@ -44,16 +44,35 @@ class VLBDiffWaveApp:
             bsize, mellen, _ = mel.shape
             # [B, T]
             noise = jnp.random.normal(key, shape=(bsize, mellen * self.config.hop))
-        # initilize
-        ir, signal = [noise], noise
-        # []
-        for time in timesteps:
-            # [B, T]
-            _, signal = self.model.apply(self.param, signal, time, mel)
-            # save intermediate representations
-            ir.append(signal)
-        # [B, T]
-        return signal, ir
+        # scanning
+        reprs = self.inference(mel, timesteps, noise)
+        # outputs and intermediate representations
+        return reprs[-1], reprs
+
+    @jax.jit
+    def inference(self, mel: jnp.ndarray, timesteps: jnp.ndarray, noise: jnp.ndarray) -> \
+            Tuple[jnp.ndarray, List[jnp.ndarray]]:
+        """Generate audio, just-in-time compiled.
+        Args:
+            mel: [float32; [B, T // H, M]], condition mel-spectrogram.
+            timesteps: [float32; [S]], time steps.
+            noise: [float32; [B, T]], starting noise.
+                neither key nor noise should be None.
+        Returns:
+            [float32; [B, T]], generated audio and intermdeidate representations.
+        """
+        def scanner(signal: jnp.ndarray, time: jnp.ndarray) -> Tuple[jnp.ndarray, jnp.ndarray]:
+            """Scanner for iterating timesteps and gradual denoising.
+            Args:
+                signal: [float32; [B, T]], speech signal.
+                time: [float32; []], current timestep.
+            Returns:
+                [float32; [B, T]], denoised signal for both carry and outputs.
+            """
+            _, denoised = self.model.apply(self.param, signal, time, mel)
+            return denoised, denoised
+        # scan
+        return jax.lax.scan(scanner, noise, timesteps)
 
     def init(self, key: np.ndarray):
         """Initialize model parameters.
