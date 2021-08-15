@@ -26,7 +26,7 @@ class TrainConfig:
 
         # segment size
         seconds = 0.5
-        self.segsize = (sr * seconds) // hop * hop
+        self.segsize = int(sr * seconds) // hop * hop
 
         # path config
         self.log = './log'
