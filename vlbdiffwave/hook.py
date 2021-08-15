@@ -54,6 +54,7 @@ def bwd_logsnr(logsnr: LogSNR,
     cot_param, cot_time = vjp(cot)
     # get loss
     loss = logsnr.pipeline.memory
+    loss = jax.lax.stop_gradient(0.5 if loss is None else loss)
     # split parameters
     endp, interp = {}, {}
     for key, val in cot_param['params'].items():
@@ -62,7 +63,7 @@ def bwd_logsnr(logsnr: LogSNR,
         else:
             interp[key] = val
     # add MC variance regularizer
-    cot_param = jax.tree_map(lambda p: 2 * loss * p, interp)
+    interp = jax.tree_map(lambda p: 2 * loss * p, interp)
     # do not touch contangent of time
     return flax.core.freeze({'params': {**endp, **interp}}), cot_time
 
