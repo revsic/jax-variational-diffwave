@@ -1,10 +1,11 @@
 import argparse
 import json
 import os
-from typing import List, Tuple
+from typing import Any, Callable, List, Tuple
 
 import librosa
 
+import flax
 import git
 import jax
 import jax.numpy as jnp
@@ -64,109 +65,123 @@ class Trainer:
         self.cmap = plt.get_cmap('viridis').colors
         self.melfilter = librosa.filters.mel(
             config.data.sr, config.data.fft, config.data.mel,
-            config.data.fmin, config.data.fmax).T
+            config.data.fmin, config.data.fmax)
+
+    def update_fn(self) -> Tuple[Callable, Callable]:
+        """Just-in-time compiled update function.
+        """
+        def update(param: flax.core.frozen_dict.FrozenDict,
+                   optim_state: Any,
+                   speech: jnp.ndarray,
+                   noise: jnp.ndarray,
+                   mel: jnp.ndarray,
+                   timestep: jnp.ndarray) -> \
+                Tuple[
+                    Tuple[jnp.ndarray, jnp.ndarray],
+                    flax.core.frozen_dict.FrozenDict,
+                    Any]:
+            """Update function.
+            Args:
+                param: model parameters.
+                optim_state: optimizer states.
+                speech: [float32; [B, T]], speech signal.
+                noise: [float32; [B, T]], sampled noise.
+                time: [float32; [B]], timesteps.
+                mel: [float32; [B, T // H, M]], mel-spectrogram.
+            Returns:
+                udpated parameters and optimizer states.
+            """
+            # [], FrozenDict
+            loss, grads = self.wrapper.gradient(param, speech, noise, mel, timestep)
+            # optimizer update
+            updates, optim_state = self.optim.update(grads, optim_state)
+            # gradient update
+            param = optax.apply_updates(param, updates)
+            # gradient norm
+            gradnorm = jnp.array(
+                [jnp.linalg.norm(x) for x in jax.tree_util.tree_leaves(grads)]).mean()
+            return (loss, gradnorm), param, optim_state
+        # jit
+        return jax.jit(update), jax.jit(self.wrapper.compute_loss)
 
     def train(self, key: jnp.ndarray, epoch: int = 0, timesteps: int = 10):
         """Train wavegrad.
         Args:
-            epoch: int, starting step.
+            key: initial random prng key.
+            epoch: starting step.
+            timesteps: sampling steps.
         """
+        update_fn, loss_fn = self.update_fn()
         step = epoch * len(self.trainset)
         for epoch in tqdm.trange(epoch, self.config.train.epoch):
             with tqdm.tqdm(total=len(self.trainset), leave=False) as pbar:
-                for mel, speech in self.trainset:
-                    self.wapper.reinit()
+                for it, (mel, speech) in enumerate(self.trainset):
+                    self.wrapper.reinit()
                     # split key
                     key, s1, s2 = jax.random.split(key, num=3)
                     # [B, T]
                     noise = jax.random.normal(s1, speech.shape)
                     # [B]
                     time = jax.random.uniform(s2, (speech.shape[0],))
-                    # [], FrozenDict, ForzenDict
-                    loss, grads = self.wrapper.gradient(
-                        self.app.param, speech, noise, time, mel)
-                    # optimizer update
-                    updates, self.optim_state = self.optim.update(grads, self.optim_state)
-                    # gradient update
-                    self.app.param = optax.apply_update(self.app.param, updates)
-
-                    norm = jnp.mean([jnp.norm(x) for x in jax.tree_utils.tree_leaves(grads)])
-                    del grads
+                    # ([], []), FrozenDict, State
+                    (loss, grad_norm), self.app.param, self.optim_state = \
+                        update_fn(self.app.param, self.optim_state, speech, noise, mel, time)
 
                     step += 1
                     pbar.update()
-                    pbar.set_postfix(
-                        {'loss': loss.numpy().item(),
-                         'step': step,
-                         'grad': norm.numpy().item()})
+                    pbar.set_postfix({'loss': loss.item(), 'step': step})
 
                     with self.train_log.as_default():
-                        tf.summary.scalar('loss', loss, step)
-                        tf.summary.scalar('grad norm', norm, step)
+                        tf.summary.scalar('common/loss', loss.item(), step)
+                        tf.summary.scalar('common/grad-norm', grad_norm.item(), step)
+
+                        param_norm = np.mean(
+                            [jnp.linalg.norm(x)
+                             for x in jax.tree_util.tree_leaves(self.app.param)])
+                        tf.summary.scalar('common/param-norm', param_norm.item(), step)
 
                         if (it + 1) % (len(self.trainset) // 10) == 0:
                             key, sub = jax.random.split(key)
-                            pred, _ = self.app(mel, jnp.linspace(0., 1., timesteps), key=sub)
+                            # [B, T]
+                            pred, _ = self.app(mel, timesteps, key=sub)
+                            # [T]
+                            pred = np.asarray(pred)[0]
                             tf.summary.audio(
-                                'train', pred[..., None], self.config.data.sr, step)
+                                'train/audio', pred[None, :, None], self.config.data.sr, step)
                             tf.summary.image(
-                                'train mel', self.mel_img(pred), step)
+                                'train/mel', self.mel_img(pred)[None], step)
                             del pred
 
             self.app.write(
                 '{}_{}.ckpt'.format(self.ckpt_path, epoch), self.optim_state)
 
             # evaluation loss
-            loss = [
-                self.wrapper.compute_loss(
-                    self.app.param, speech, noise, time, mel).item()
+            loss = np.mean([
+                loss_fn(self.app.param, speech, noise, time, mel).item()
                 for mel, speech in DatasetWrapper(
-                    self.testset, self.config.train.segsize, self.config.data.hop)]
-            loss = sum(loss) / len(loss)
+                    self.testset, self.config.train.segsize, self.config.data.hop)])
             # test log
             with self.test_log.as_default():
-                tf.summary.scalar('loss', loss, step)
+                tf.summary.scalar('common/loss', loss.item(), step)
 
                 gt, pred, ir = self.eval(timesteps)
                 tf.summary.audio(
-                    'gt', gt[None, :, None], self.config.data.sr, step)
+                    'eval/gt', gt[None, :, None], self.config.data.sr, step)
                 tf.summary.audio(
-                    'eval', pred[None, :, None], self.config.data.sr, step)
+                    'eval/audio', pred[None, :, None], self.config.data.sr, step)
 
                 tf.summary.image(
-                    'gt mel', self.mel_img(gt[None]), step)
+                    'eval/gt', self.mel_img(gt)[None], step)
                 tf.summary.image(
-                    'eval mel', self.mel_img(pred[None]), step)
+                    'eval/mel', self.mel_img(pred)[None], step)
 
-                for i in ir:
-                    tf.summary.audio(
-                        'ir_{}'.format(i),
-                        np.clip(ir[i][None, :, None], -1., 1.),
-                        self.config.data.sr, step)
-                
+                for i in range(timesteps):
+                    tf.summary.image(f'eval/ir{i}', self.mel_img(ir[i])[None], step)
+
                 del gt, pred, ir
 
-    def mel_img(self, signal: jnp.ndarray) -> jnp.ndarray:
-        """Generate mel-spectrogram images.
-        Args:
-            signal: [float32; [B, T]], speech signal.
-        Returns:
-            [float32; [B, M, T // H, 3]], mel-spectrogram in viridis color map.
-        """
-        # [B, M, T // H]
-        mel = self.mel_fn(signal).transpose(0, 2, 1)
-        # minmax norm in range(0, 1)
-        mel = (mel - mel.min()) / (mel.max() - mel.min())
-        # in range(0, 255)
-        mel = (mel * 255).astype(jnp.long)
-        # [B, M, T // H, 3]
-        mel = self.cmap[mel]
-        # make origin lower
-        mel = jnp.flip(mel, axis=1)
-        return mel
-
     def eval(self, timesteps: int = 10) -> \
-            Tuple[jnp.ndarray, jnp.ndarray, List[jnp.ndarray]]:
+            Tuple[np.ndarray, np.ndarray, List[np.ndarray]]:
         """Generate evaluation purpose audio.
         Args:
             timesteps: the number of the time steps. 
@@ -179,35 +194,51 @@ class Trainer:
         # [B, T // H, M], [B, T], [B], [B]
         mel, speech, mellen, speechlen = next(self.testset.as_numpy_iterator())
         # [1, T], steps x [1, T]
-        pred, ir = self.app(
-            mel[0:1, :mellen[0]],
-            jnp.linspace(0., 1., timesteps),
-            key=jax.random.PRNGKey(0))
+        pred, ir = self.app(mel[0:1, :mellen[0]], timesteps, key=jax.random.PRNGKey(0))
         # [T]
-        pred = pred.squeeze(axis=0)
+        pred = np.asarray(pred.squeeze(axis=0))
         # config.model.iter x [T]
-        ir = [i.squeeze(axis=0) for i in ir]
+        ir = [np.asarray(i.squeeze(axis=0)) for i in ir]
         return speech[0, :speechlen[0]], pred, ir
     
-    def mel_fn(self, signal: jnp.ndarray) -> jnp.ndarray:
+    def mel_fn(self, signal: np.ndarray) -> np.ndarray:
         """Convert signal to the mel-spectrogram.
         Args:
-            signal: [float32; [B, T]], input signal.
+            signal: [float32; [T]], input signal.
         Returns:
-            [float32; [B, T // H, M]], mel-spectrogram.
+            [float32; [M, T // H]], mel-spectrogram.
         """
-        # [B, T // H, fft // 2 + 1]
+        # [fft // 2 + 1, T // H]
         stft = librosa.stft(
-            np.asarray(signal),
+            signal,
             self.config.data.fft,
             self.config.data.hop,
             self.config.data.win,
             self.config.data.win_fn,
             center=True, pad_mode='reflect')
-        # [B, T // H, M]
-        mel = np.abs(stft) @ self.melfilter
-        # [B, T // H, M]
-        return jnp.array(np.log(np.maximum(mel, self.config.data.eps)))
+        # [M, T // H]
+        mel = self.melfilter @ np.abs(stft)
+        # [M, T // H]
+        return np.log(np.maximum(mel, self.config.data.eps))
+
+    def mel_img(self, signal: np.ndarray) -> np.ndarray:
+        """Generate mel-spectrogram images.
+        Args:
+            signal: [float32; [T]], speech signal.
+        Returns:
+            [float32; [M, T // H, 3]], mel-spectrogram in viridis color map.
+        """
+        # [M, T // H]
+        mel = self.mel_fn(signal)
+        # minmax norm in range(0, 1)
+        mel = (mel - mel.min()) / (mel.max() - mel.min())
+        # in range(0, 255)
+        mel = (mel * 255).astype(jnp.long)
+        # [M, T // H, 3]
+        mel = self.cmap[mel]
+        # make origin lower
+        mel = np.flip(mel, axis=0)
+        return mel
 
 
 if __name__ == '__main__':
