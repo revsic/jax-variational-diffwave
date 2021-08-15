@@ -5,6 +5,7 @@ import jax
 import jax.numpy as jnp
 
 from vlbdiffwave.impl import VLBDiffWave
+from vlbdiffwave.hook import hooked_logsnr
 
 
 class TrainWrapper:
@@ -39,10 +40,12 @@ class TrainWrapper:
         estim, _ = self.model.apply(params, diffusion, mel, timestep)
         # [B]
         mse = jnp.square(noise - estim).sum(axis=-1)
+        # for derivatives of log-SNR
+        def logsnr(time: jnp.ndarray):
+            logsnr, _ = hooked_logsnr(self.model.logsnr, params['logsnr'], time)
+            return logsnr.sum()
         # [B], dlog-SNR/dt
-        dlogsnr = jax.grad(
-            # lifting
-            lambda t: self.model.logsnr.apply(params['logsnr'], t)[0].sum())(timestep)
+        dlogsnr = jax.grad(logsnr)(timestep)
         # [B]
         loss = -0.5 * dlogsnr * mse
         # []
