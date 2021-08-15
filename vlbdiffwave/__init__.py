@@ -1,5 +1,5 @@
 import os
-from typing import Any, List, Optional, Tuple
+from typing import Any, List, Optional, Tuple, Union
 
 import jax
 import jax.numpy as jnp
@@ -24,14 +24,14 @@ class VLBDiffWaveApp:
 
     def __call__(self,
                  mel: jnp.ndarray,
-                 timesteps: jnp.ndarray,
+                 timesteps: Union[int, jnp.ndarray] = 10,
                  key: Optional[jnp.ndarray] = None,
                  noise: Optional[jnp.ndarray] = None) -> \
             Tuple[jnp.ndarray, List[jnp.ndarray]]:
         """Generate audio from mel-spectrogram.
         Args:
             mel: [float32; [B, T // H, M]], condition mel-spectrogram.
-            timesteps: [float32; [S]], time steps.
+            timesteps: [float32; [S]], time steps, from one to zero, including endpoint.
             key: jax random prng key.
             noise: [float32; [B, T]], starting noise.
                 neither key nor noise should be None.
@@ -45,6 +45,9 @@ class VLBDiffWaveApp:
             bsize, mellen, _ = mel.shape
             # [B, T]
             noise = jnp.random.normal(key, shape=(bsize, mellen * self.config.hop))
+        if isinstance(timesteps, int):
+            # [S]
+            timesteps = jnp.linapce(1., 0., timesteps + 1)
         # scanning
         reprs = self.inference(mel, timesteps, noise)
         # outputs and intermediate representations
@@ -56,22 +59,37 @@ class VLBDiffWaveApp:
         """Generate audio, just-in-time compiled.
         Args:
             mel: [float32; [B, T // H, M]], condition mel-spectrogram.
-            timesteps: [float32; [S]], time steps.
+            timesteps: [float32; [S + 1]], time steps.
             noise: [float32; [B, T]], starting noise.
                 neither key nor noise should be None.
         Returns:
             [float32; [B, T]], generated audio and intermdeidate representations.
         """
-        def scanner(signal: jnp.ndarray, time: jnp.ndarray) -> Tuple[jnp.ndarray, jnp.ndarray]:
+        def scanner(signal: jnp.ndarray, time: jnp.ndarray) -> \
+                Tuple[jnp.ndarray, jnp.ndarray]:
             """Scanner for iterating timesteps and gradual denoising.
             Args:
                 signal: [float32; [B, T]], speech signal.
-                time: [float32; []], current timestep.
+                time: [float32; [2]], current and next timesteps.
             Returns:
                 [float32; [B, T]], denoised signal for both carry and outputs.
             """
-            _, denoised = self.model.apply(self.param, signal, time, mel)
+            # [], []
+            time_t, time_s = time
+            # [1] x 2
+            _, _, alpha_sq_s, sigma_sq_s = self.model.snr(self.param, time_s[None])
+            # [B, T], [B], [B]
+            noise, (alpha_sq_t, sigma_sq_t) = self.model.apply(
+                self.param, signal, jnp.full([signal.shape[0]], time_t), mel)
+            # [B]
+            alpha_sq_tbars = alpha_sq_t / alpha_sq_s
+            sigma_sq_tbars = sigma_sq_t - alpha_sq_tbars * sigma_sq_s
+            # [B, T]
+            denoised = 1 / jnp.sqrt(alpha_sq_tbars) * (
+                signal - sigma_sq_tbars / jnp.sqrt(sigma_sq_t) * noise)
             return denoised, denoised
+        # [S, 2], 
+        timesteps = jnp.stack([timesteps[:-1], timesteps[1:]], axis=1)
         # scan
         return jax.lax.scan(scanner, noise, timesteps)
 
