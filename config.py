@@ -45,7 +45,7 @@ class Config:
     def __init__(self):
         self.data = DataConfig()
         self.model = ModelConfig(self.data.hop)
-        self.train = TrainConfig(self.data.sr)
+        self.train = TrainConfig(self.data.sr, self.data.hop)
 
     def dump(self):
         """Dump configurations into serializable dictionary.
