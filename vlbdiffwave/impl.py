@@ -55,10 +55,10 @@ class VLBDiffWave:
         return logsnr, norm_nlogsnr, alpha, sigma
 
     def apply(self,
-                 param: flax.core.frozen_dict.FrozenDict,
-                 signal: jnp.ndarray,
-                 time: jnp.ndarray,
-                 mel: jnp.ndarray) -> Tuple[jnp.ndarray, jnp.ndarray]:
+              param: flax.core.frozen_dict.FrozenDict,
+              signal: jnp.ndarray,
+              time: jnp.ndarray,
+              mel: jnp.ndarray) -> Tuple[jnp.ndarray, jnp.ndarray]:
         """Denoise signal w.r.t timestep on mel-condition.
         Args:
             param: model parameters.
