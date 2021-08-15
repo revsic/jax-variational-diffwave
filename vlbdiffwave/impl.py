@@ -58,7 +58,7 @@ class VLBDiffWave:
               param: flax.core.frozen_dict.FrozenDict,
               signal: jnp.ndarray,
               time: jnp.ndarray,
-              mel: jnp.ndarray) -> Tuple[jnp.ndarray, jnp.ndarray]:
+              mel: jnp.ndarray) -> Tuple[jnp.ndarray, Tuple[jnp.ndarray, jnp.ndarray]]:
         """Denoise signal w.r.t timestep on mel-condition.
         Args:
             param: model parameters.
@@ -66,15 +66,14 @@ class VLBDiffWave:
             timestep: [float32; [B]], current timestep.
             mel: [float32; [B, T // H, M]], mel-spectrogram.
         Returns:
-            [float32; [B, T]], noise and denoised signal.
+            noise: [float32; [B, T]], estimated noise.
+            alpha, sigma: [float32; [B]], signal, noise rate. 
         """
         # [B] x 4
         _, norm_nlogsnr, alpha, sigma = self.snr(param['logsnr'], time)
         # [B, T]
-        noise = self.diffwave.apply(param['diffwave'], signal, norm_nlogsnr, mel)
-        # [B, T]
-        denoised = (signal - sigma * noise) / alpha        
-        return noise, denoised
+        noise = self.diffwave.apply(param['diffwave'], signal, norm_nlogsnr, mel)     
+        return noise, (alpha, sigma)
 
     def diffusion(self,
                   param: flax.core.frozen_dict.FrozenDict,
@@ -99,7 +98,7 @@ class VLBDiffWave:
         time = s if t is None else jnp.concatenate([s, t], axis=0)
         # [B'] x 4
         _, _, alpha, sigma = self.snr(param['logsnr'], time)
-        if t is None:
+        if t is not None:
             # [B]
             alpha_s, alpha_t = alpha[:bsize], alpha[bsize:]
             sigma_s, sigma_t = sigma[:bsize], sigma[bsize:]
