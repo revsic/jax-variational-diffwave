@@ -36,7 +36,7 @@ class TrainWrapper:
         # [B, T]
         diffusion = self.model.diffusion(params, signal, noise, timestep)
         # [B, T]
-        estim, _ = self.model.apply(params, diffusion, timestep, mel)
+        estim, _ = self.model.apply(params, diffusion, mel, timestep)
         # [B]
         mse = jnp.square(noise - estim).sum(axis=-1)
         # [B], dlog-SNR/dt
