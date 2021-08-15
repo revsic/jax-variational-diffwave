@@ -1,4 +1,5 @@
-from typing import List, Optional, Tuple
+import os
+from typing import Any, List, Optional, Tuple
 
 import jax
 import jax.numpy as jnp
@@ -88,19 +89,24 @@ class VLBDiffWaveApp:
         # initialize
         self.param = self.model.init(key, signal, time, mel)
 
-    def write(self, path: str):
+    def write(self, path: str, optim: Optional[Any] = None):
         """Write model checkpoints.
         Args:
             path: path to the checkpoint.
+            optim: optimizer state.
         """
-        with open(path + '.ckpt', 'wb') as f:
+        with open(path, 'wb') as f:
             f.write(flax.serialization.to_bytes(self.param))
+        if optim is not None:
+            name, ext = os.path.splitext(path)
+            with open(f'{name}_optim{ext}', 'wb') as f:
+                f.write(flax.serialization.to_bytes(optim))
 
-    def restore(self, path: str):
+    def restore(self, path: str, optim: Optional[Any] = None):
         """Restore model parameters from `path` checkpoint.
         Args:
             path: path to the checkpoint.
-            params: model parameters, for restore.
+            optim: optimizer state, if provided.
         """
         with open(path, 'rb') as f:
             binary = f.read()
@@ -109,3 +115,10 @@ class VLBDiffWaveApp:
             self.init(jax.random.PRNGKey(0))
         # restore
         flax.serialization.from_bytes(self.param, binary)
+        # auxiliary restoration
+        if optim is not None:
+            name, ext = os.path.splitext(path)
+            with open(f'{name}_optim{ext}', 'rb') as f:
+                binary = f.read()
+            # restore
+            flax.serialization.from_bytes(optim, binary)
