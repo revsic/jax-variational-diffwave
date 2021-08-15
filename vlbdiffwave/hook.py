@@ -53,7 +53,7 @@ def bwd_logsnr(logsnr: LogSNR,
     # flax.core.frozen_dict.FrozenDict, jnp.ndarray
     cot_param, cot_time = vjp(cot)
     # get loss
-    loss = logsnr.pipeline.memory
+    loss = logsnr.memory
     # add MC variance regularizer
     cot_param = jax.tree_map(lambda p: 2 * loss * p, cot_param)
     # do not touch contangent of time

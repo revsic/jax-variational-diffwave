@@ -50,7 +50,7 @@ class TrainWrapper:
         # []
         loss = loss.mean()
         # set loss to the memory
-        self.model.logsnr.pipeline.memory = loss
+        self.model.logsnr.memory = loss
         return loss
 
     def gradient(self,

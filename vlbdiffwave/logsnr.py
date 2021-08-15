@@ -37,15 +37,6 @@ class PosDense(nn.Module):
         return x
 
 
-class Pipeline:
-    """Residual pipeline.
-    """
-    def __init__(self):
-        """Initializer.
-        """
-        self.memory = None
-
-
 class LogSNR(nn.Module):
     """Learnable noise scheduler: logSNR.
     """
@@ -69,7 +60,7 @@ class LogSNR(nn.Module):
         self.proj2 = PosDense(channels=self.internal)
         self.proj3 = PosDense(channels=1)
         # memory
-        self.pipeline = Pipeline()
+        self.memory = None
 
     def __call__(self, inputs: jnp.ndarray) -> Tuple[jnp.ndarray, jnp.ndarray]:
         """Compute logSNR from continuous timesteps.
