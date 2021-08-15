@@ -17,6 +17,12 @@ class TrainWrapper:
             diffwave: Target model.
         """
         self.model = diffwave
+        self.gradient = jax.jit(jax.value_and_grad(self.compute_loss))
+
+    def reinit(self):
+        """Reinitialize.
+        """
+        self.model.logsnr.pipeline.memory = None
 
     def compute_loss(self,
                      params: flax.core.frozen_dict.FrozenDict,
@@ -53,25 +59,3 @@ class TrainWrapper:
         # set loss to the memory
         self.model.logsnr.pipeline.memory = loss
         return loss
-
-    def gradient(self,
-                 params: flax.core.frozen_dict.FrozenDict,
-                 signal: jnp.ndarray,
-                 noise: jnp.ndarray,
-                 mel: jnp.ndarray,
-                 timestep: jnp.ndarray) -> \
-            Tuple[jnp.ndarray, flax.core.frozen_dict.FrozenDict]:
-        """Compute gradients.
-        Args:
-            params: diffwave model parameters.
-            signal: [float32; [B, T]], speech signal.
-            noise: [float32; [B, T]], noise signal.
-            mel: [float32; [B, T // H, M]], mel-spectrogram.
-            timestep: [float32; [B]], input timestep.
-        Returns:
-            loss: loss value.
-            grads: gradients for each parameters.
-        """
-        # [], FrozenDict
-        return jax.value_and_grad(self.compute_loss)(
-            params, signal, noise, mel, timestep)
