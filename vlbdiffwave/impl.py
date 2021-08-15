@@ -45,14 +45,14 @@ class VLBDiffWave:
             param: parameters of LogSNR.
             time: [float32; [B]], current timestep.
         Returns:
-            [float32; [B]], logSNR, normalized -logSNR, alpha and sigma.
+            [float32; [B]], logSNR, normalized -logSNR, square of alpha and sigma.
         """
         # [B], [B]
         logsnr, norm_nlogsnr = hooked_logsnr(self.logsnr, param, time)
         # [B]
-        alpha = jnp.sqrt(jnp.maximum(nn.sigmoid(logsnr), 1e-5))
-        sigma = jnp.sqrt(jnp.maximum(nn.sigmoid(-logsnr), 1e-5))
-        return logsnr, norm_nlogsnr, alpha, sigma
+        alpha_sq = jnp.maximum(nn.sigmoid(logsnr))
+        sigma_sq = jnp.maximum(nn.sigmoid(-logsnr))
+        return logsnr, norm_nlogsnr, alpha_sq, sigma_sq
 
     def apply(self,
               param: flax.core.frozen_dict.FrozenDict,
@@ -67,13 +67,13 @@ class VLBDiffWave:
             mel: [float32; [B, T // H, M]], mel-spectrogram.
         Returns:
             noise: [float32; [B, T]], estimated noise.
-            alpha, sigma: [float32; [B]], signal, noise rate. 
+            alpha_sq, sigma_sq: [float32; [B]], signal, noise rates. 
         """
         # [B] x 4
-        _, norm_nlogsnr, alpha, sigma = self.snr(param['logsnr'], time)
+        _, norm_nlogsnr, alpha_sq, sigma_sq = self.snr(param['logsnr'], time)
         # [B, T]
         noise = self.diffwave.apply(param['diffwave'], signal, norm_nlogsnr, mel)     
-        return noise, (alpha, sigma)
+        return noise, (alpha_sq, sigma_sq)
 
     def diffusion(self,
                   param: flax.core.frozen_dict.FrozenDict,
@@ -97,15 +97,18 @@ class VLBDiffWave:
         # [B']
         time = s if t is None else jnp.concatenate([s, t], axis=0)
         # [B'] x 4
-        _, _, alpha, sigma = self.snr(param['logsnr'], time)
+        _, _, alpha_sq, sigma_sq = self.snr(param['logsnr'], time)
         if t is not None:
             # [B]
-            alpha_s, alpha_t = alpha[:bsize], alpha[bsize:]
-            sigma_s, sigma_t = sigma[:bsize], sigma[bsize:]
+            alpha_sq_s, alpha_sq_t = alpha_sq[:bsize], alpha_sq[bsize:]
+            sigma_sq_s, sigma_sq_t = sigma_sq[:bsize], sigma_sq[bsize:]
             # [B]
-            alpha_tbars = alpha_t / alpha_s
-            sigma_tbars = jnp.sqrt(sigma_t ** 2 - alpha_tbars * sigma_s ** 2)
+            alpha_sq_tbars = alpha_sq_t / alpha_sq_s
+            sigma_sq_tbars = jnp.sqrt(sigma_sq_t - alpha_sq_tbars * sigma_sq_s)
             # [B]
-            alpha, sigma = alpha_tbars, sigma_tbars
+            alpha_sq, sigma_sq = alpha_sq_tbars, sigma_sq_tbars
+        # [B]
+        alpha = jnp.sqrt(jnp.maximum(alpha_sq, 1e-5))
+        sigma = jnp.sqrt(jnp.maximum(sigma_sq, 1e-5))
         # [B, T]
         return alpha * signal + sigma * noise
