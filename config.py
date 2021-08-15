@@ -5,7 +5,12 @@ from vlbdiffwave.config import Config as ModelConfig
 class TrainConfig:
     """Configuration for training loop.
     """
-    def __init__(self):
+    def __init__(self, sr: int, hop: int):
+        """Initializer.
+        Args:
+            sr: sample rate, for relative segment size.
+            hop: stft hop size.
+        """
         # optimizer
         self.learning_rate = 2e-4
         self.beta1 = 0.9
@@ -16,7 +21,12 @@ class TrainConfig:
         self.split = 13000
         self.bufsiz = 48
 
-        self.epoch = 10000
+        # train iters
+        self.epoch = 100
+
+        # segment size
+        seconds = 0.5
+        self.segsize = (sr * seconds) // hop * hop
 
         # path config
         self.log = './log'
@@ -24,10 +34,6 @@ class TrainConfig:
 
         # model name
         self.name = 'l1'
-
-        # interval configuration
-        self.eval_intval = 5000
-        self.ckpt_intval = 10000
 
         # commit hash
         self.hash = 'unknown'
@@ -39,7 +45,7 @@ class Config:
     def __init__(self):
         self.data = DataConfig()
         self.model = ModelConfig(self.data.hop)
-        self.train = TrainConfig()
+        self.train = TrainConfig(self.data.sr)
 
     def dump(self):
         """Dump configurations into serializable dictionary.
