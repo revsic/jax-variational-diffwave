@@ -141,4 +141,4 @@ class VLBDiffWave:
         alpha = jnp.sqrt(jnp.maximum(alpha_sq, 1e-5))
         sigma = jnp.sqrt(jnp.maximum(sigma_sq, 1e-5))
         # [B, T]
-        return alpha * signal + sigma * noise
+        return alpha[:, None] * signal + sigma[:, None] * noise
