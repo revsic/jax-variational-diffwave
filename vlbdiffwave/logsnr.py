@@ -37,10 +37,21 @@ class PosDense(nn.Module):
         return x
 
 
+class Pipeline:
+    """Pipeline for bypassing submodule registeration.
+    """
+    def __init__(self):
+        """Initializer.
+        """
+        self.memory = None
+
+
 class LogSNR(nn.Module):
     """Learnable noise scheduler: logSNR.
     """
     internal: int
+    # pipeline
+    pipeline: Pipeline
     # initialize in range [-10, 10]
     # reference from Variational Diffusion Models, range of learned log-SNR.
     initial_gamma_min: float = -10.
@@ -59,8 +70,6 @@ class LogSNR(nn.Module):
         self.proj1 = PosDense(channels=1)
         self.proj2 = PosDense(channels=self.internal)
         self.proj3 = PosDense(channels=1)
-        # memory
-        self.memory = None
 
     def __call__(self, inputs: jnp.ndarray) -> Tuple[jnp.ndarray, jnp.ndarray]:
         """Compute logSNR from continuous timesteps.
