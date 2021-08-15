@@ -64,7 +64,7 @@ def bwd_logsnr(logsnr: LogSNR,
     # add MC variance regularizer
     cot_param = jax.tree_map(lambda p: 2 * loss * p, interp)
     # do not touch contangent of time
-    return {'params': {**endp, **interp}}, cot_time
+    return flax.core.freeze({'params': {**endp, **interp}}), cot_time
 
 # define vjp
 hooked_logsnr.defvjp(fwd_logsnr, bwd_logsnr)
