@@ -48,10 +48,8 @@ class VLBDiffWaveApp:
         if isinstance(timesteps, int):
             # [S]
             timesteps = jnp.linspace(1., 0., timesteps + 1)
-        # scanning
-        reprs = self.inference(mel, timesteps, noise)
-        # outputs and intermediate representations
-        return reprs[-1], reprs
+        # scanning, outputs and intermediate representations
+        return self.inference(mel, timesteps, noise)
 
     def inference(self, mel: jnp.ndarray, timesteps: jnp.ndarray, noise: jnp.ndarray) -> \
             Tuple[jnp.ndarray, List[jnp.ndarray]]:
