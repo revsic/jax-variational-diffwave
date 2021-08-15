@@ -55,20 +55,20 @@ class TrainWrapper:
                  params: flax.core.frozen_dict.FrozenDict,
                  signal: jnp.ndarray,
                  noise: jnp.ndarray,
-                 timestep: jnp.ndarray,
-                 mel: jnp.ndarray) -> \
+                 mel: jnp.ndarray,
+                 timestep: jnp.ndarray) -> \
             Tuple[jnp.ndarray, flax.core.frozen_dict.FrozenDict]:
         """Compute gradients.
         Args:
             params: diffwave model parameters.
             signal: [float32; [B, T]], speech signal.
             noise: [float32; [B, T]], noise signal.
-            timestep: [float32; [B]], input timestep.
             mel: [float32; [B, T // H, M]], mel-spectrogram.
+            timestep: [float32; [B]], input timestep.
         Returns:
             loss: loss value.
             grads: gradients for each parameters.
         """
         # [], FrozenDict
         return jax.value_and_grad(self.compute_loss)(
-            params, signal, noise, timestep, mel)
+            params, signal, noise, mel, timestep)
