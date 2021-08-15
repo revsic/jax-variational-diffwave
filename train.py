@@ -18,6 +18,7 @@ import tqdm
 from config import Config
 from speechset import VocoderDataset
 from speechset.datasets import LJSpeech
+from utils.datasets import Datasets
 from utils.wrapper import TrainWrapper
 from vlbdiffwave import VLBDiffWaveApp
 
@@ -39,16 +40,10 @@ class Trainer:
         self.wrapper = TrainWrapper(self.app.model)
 
         trainset, testset = self.vocdata.dataset(config.train.split)
-        self.trainset = trainset \
-            .shuffle(config.train.bufsiz) \
-            .prefetch(tf.data.experimental.AUTOTUNE)
-        self.testset = testset \
-            .prefetch(tf.data.experimental.AUTOTUNE)
-
-        self.trainsize = tf.data.experimental.cardinality(
-            self.trainset).numpy().item()
-        self.testsize = tf.data.experimental.cardinality(
-            self.testset).numpy().item()
+        self.trainset = Datasets(trainset
+            .shuffle(config.train.bufsiz)
+            .prefetch(tf.data.experimental.AUTOTUNE))
+        self.testset = testset.prefetch(tf.data.experimental.AUTOTUNE)
 
         self.optim = optax.adam(
             config.train.learning_rate,
@@ -80,7 +75,7 @@ class Trainer:
         step = epoch * self.trainsize
         for epoch in tqdm.trange(epoch, self.config.train.epoch):
             with tqdm.tqdm(total=self.trainsize, leave=False) as pbar:
-                for it, (mel, speech, mellen, speechlen) in enumerate(self.trainset):
+                for it, (mel, speech) in enumerate(self.trainset):
                     # split key
                     key, s1, s2 = jax.random.split(key, num=3)
                     # [B, T]
@@ -108,25 +103,23 @@ class Trainer:
                     with self.train_log.as_default():
                         tf.summary.scalar('loss', loss, step)
                         tf.summary.scalar('grad norm', norm, step)
-                        if step % self.eval_intval == 0:
+
+                        if (it + 1) % (len(self.trainset) // 10) == 0:
                             key, sub = jax.random.split(key)
                             pred, _ = self.app(mel, jnp.linspace(0., 1., timesteps), key=sub)
                             tf.summary.audio(
                                 'train', pred[..., None], self.config.data.sr, step)
                             tf.summary.image(
                                 'train mel', self.mel_img(pred), step)
-
                             del pred
 
-                    if step % self.ckpt_intval == 0:
-                        self.model.write(
-                            '{}_{}.ckpt'.format(self.ckpt_path, step),
-                            self.optim)
+            self.app.write(
+                '{}_{}.ckpt'.format(self.ckpt_path, epoch), self.optim)
 
             loss = [
                 self.wrapper.compute_loss(
                     self.app.param, speech, noise, time, mel).item()
-                for mel, speech, mellen, speechlen in self.testset
+                for mel, speech in Datasets(self.testset)
             ]
             loss = sum(loss) / len(loss)
             with self.test_log.as_default():
@@ -184,7 +177,7 @@ class Trainer:
         # [B, T // H, M], [B, T], [B], [B]
         mel, speech, mellen, speechlen = next(self.testset.as_numpy_iterator())
         # [1, T], steps x [1, T]
-        pred, ir = self.model(
+        pred, ir = self.app(
             mel[0:1, :mellen[0]],
             jnp.linspace(0., 1., timesteps),
             key=jax.random.PRNGKey(0))
