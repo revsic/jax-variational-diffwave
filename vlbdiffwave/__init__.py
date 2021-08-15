@@ -76,17 +76,9 @@ class VLBDiffWaveApp:
             """
             # [], []
             time_t, time_s = time
-            # [1] x 2
-            _, _, alpha_sq_s, sigma_sq_s = self.model.snr(self.param, time_s[None])
-            # [B, T], [B], [B]
-            noise, (alpha_sq_t, sigma_sq_t) = self.model.apply(
-                self.param, signal, jnp.full([signal.shape[0]], time_t), mel)
-            # [B]
-            alpha_sq_tbars = alpha_sq_t / alpha_sq_s
-            sigma_sq_tbars = sigma_sq_t - alpha_sq_tbars * sigma_sq_s
             # [B, T]
-            denoised = 1 / jnp.sqrt(alpha_sq_tbars) * (
-                signal - sigma_sq_tbars / jnp.sqrt(sigma_sq_t) * noise)
+            denoised = self.model.denoise(
+                self.param, signal, mel, time_t[None], time_s[None])
             return denoised, denoised
         # [S, 2], 
         timesteps = jnp.stack([timesteps[:-1], timesteps[1:]], axis=1)
