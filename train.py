@@ -41,7 +41,7 @@ class Trainer:
         trainset, testset = self.vocdata.dataset(config.train.split)
         self.trainset = DatasetWrapper(trainset
             .shuffle(config.train.bufsiz)
-            .prefetch(tf.data.experimental.AUTOTUNE))
+            .prefetch(tf.data.experimental.AUTOTUNE), self.config.train.segsize)
         self.testset = testset.prefetch(tf.data.experimental.AUTOTUNE)
 
         self.optim = optax.adam(
@@ -118,7 +118,7 @@ class Trainer:
             loss = [
                 self.wrapper.compute_loss(
                     self.app.param, speech, noise, time, mel).item()
-                for mel, speech in DatasetWrapper(self.testset)
+                for mel, speech in DatasetWrapper(self.testset, self.config.train.segsize)
             ]
             loss = sum(loss) / len(loss)
             with self.test_log.as_default():
