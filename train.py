@@ -170,11 +170,11 @@ class Trainer:
         mel = jnp.flip(mel, axis=1)
         return mel
 
-    def eval(self, steps: int = 10) -> \
+    def eval(self, timesteps: int = 10) -> \
             Tuple[jnp.ndarray, jnp.ndarray, List[jnp.ndarray]]:
         """Generate evaluation purpose audio.
         Args:
-            steps: the number of the time steps. 
+            timesteps: the number of the time steps. 
         Returns:
             speech: [float32; [T]], ground truth.
             pred: [float32; [T]], predicted.
@@ -186,7 +186,7 @@ class Trainer:
         # [1, T], steps x [1, T]
         pred, ir = self.model(
             mel[0:1, :mellen[0]],
-            jnp.linspace(0., 1., steps),
+            jnp.linspace(0., 1., timesteps),
             key=jax.random.PRNGKey(0))
         # [T]
         pred = pred.squeeze(axis=0)
