@@ -53,8 +53,8 @@ def bwd_logsnr(logsnr: LogSNR,
     # flax.core.frozen_dict.FrozenDict, jnp.ndarray
     cot_param, cot_time = vjp(cot)
     # get loss
-    loss = logsnr.pipeline.memory
-    loss = jax.lax.stop_gradient(0.5 if loss is None else loss)
+    loss = 0.5 if logsnr.pipeline.memory is None \
+        else jax.lax.stop_gradient(logsnr.pipeline.memory)
     # split parameters
     endp, interp = {}, {}
     for key, val in cot_param['params'].items():
