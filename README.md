@@ -9,7 +9,7 @@ Jax/Flax implementation of Variational-DiffWave. (Zhifeng Kong et al., 2020, Die
 
 ## Requirements
 
-Tested in python 3.7.9 conda environment, requirements.txt
+Tested in python 3.7.9 conda environment, [requirements.txt](./requirements.txt)
 
 ## Usage
 
