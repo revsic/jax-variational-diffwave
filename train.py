@@ -45,7 +45,10 @@ class Trainer:
                 .prefetch(tf.data.experimental.AUTOTUNE),
             self.config.train.segsize,
             self.config.data.hop)
-        self.testset = testset.prefetch(tf.data.experimental.AUTOTUNE)
+        self.testset = DatasetWrapper(
+            testset.prefetch(tf.data.experimental.AUTOTUNE),
+            self.config.train.segsize,
+            self.config.data.hop)
 
         self.optim = optax.adam(
             config.train.learning_rate,
@@ -62,12 +65,15 @@ class Trainer:
         self.ckpt_path = os.path.join(
             config.train.ckpt, config.train.name, config.train.name)
 
-        self.cmap = plt.get_cmap('viridis').colors
+        self.cmap = np.array(plt.get_cmap('viridis').colors)
         self.melfilter = librosa.filters.mel(
             config.data.sr, config.data.fft, config.data.mel,
             config.data.fmin, config.data.fmax)
+        
+        self.loss_fn = jax.jit(self.wrapper.compute_loss, static_argnames='hook')
+        self.update_fn = self.jaxjit_update()
 
-    def update_fn(self) -> Tuple[Callable, Callable]:
+    def jaxjit_update(self) -> Callable:
         """Just-in-time compiled update function.
         """
         def update(param: flax.core.frozen_dict.FrozenDict,
@@ -102,7 +108,7 @@ class Trainer:
                 [jnp.linalg.norm(x) for x in jax.tree_util.tree_leaves(grads)]).mean()
             return (loss, gradnorm), param, optim_state
         # jit
-        return jax.jit(update), jax.jit(self.wrapper.compute_loss)
+        return jax.jit(update)
 
     def train(self, key: jnp.ndarray, epoch: int = 0, timesteps: int = 10):
         """Train wavegrad.
@@ -111,7 +117,6 @@ class Trainer:
             epoch: starting step.
             timesteps: sampling steps.
         """
-        update_fn, loss_fn = self.update_fn()
         step = epoch * len(self.trainset)
         for epoch in tqdm.trange(epoch, self.config.train.epoch):
             with tqdm.tqdm(total=len(self.trainset), leave=False) as pbar:
@@ -125,7 +130,8 @@ class Trainer:
                     time = jax.random.uniform(s2, (speech.shape[0],))
                     # ([], []), FrozenDict, State
                     (loss, grad_norm), self.app.param, self.optim_state = \
-                        update_fn(self.app.param, self.optim_state, speech, noise, mel, time)
+                        self.update_fn(self.app.param, self.optim_state,
+                                       speech, noise, mel, time)
 
                     step += 1
                     pbar.update()
@@ -155,14 +161,21 @@ class Trainer:
             self.app.write(
                 '{}_{}.ckpt'.format(self.ckpt_path, epoch), self.optim_state)
 
-            # evaluation loss
-            loss = np.mean([
-                loss_fn(self.app.param, speech, noise, time, mel).item()
-                for mel, speech in DatasetWrapper(
-                    self.testset, self.config.train.segsize, self.config.data.hop)])
+            # test loss
+            losses = []
+            for mel, speech in tqdm.tqdm(self.testset, leave=False):
+                key, s1, s2 = jax.random.split(key, num=3)
+                # [B, T]
+                noise = jax.random.normal(s1, speech.shape)
+                # [B]
+                time = jax.random.uniform(s2, (speech.shape[0],))
+                # []
+                loss = self.loss_fn(self.app.param, speech, noise, mel, time, hook=False)
+                # []
+                losses.append(loss)
             # test log
             with self.test_log.as_default():
-                tf.summary.scalar('common/loss', loss.item(), step)
+                tf.summary.scalar('common/loss', np.mean(losses).item(), step)
 
                 gt, pred, ir = self.eval(timesteps)
                 tf.summary.audio(
@@ -192,7 +205,7 @@ class Trainer:
                 intermediate represnetations.
         """
         # [B, T // H, M], [B, T], [B], [B]
-        mel, speech, mellen, speechlen = next(self.testset.as_numpy_iterator())
+        mel, speech, mellen, speechlen = next(self.testset.dataset.as_numpy_iterator())
         # [1, T], steps x [1, T]
         pred, ir = self.app(mel[0:1, :mellen[0]], timesteps, key=jax.random.PRNGKey(0))
         # [T]
@@ -233,7 +246,7 @@ class Trainer:
         # minmax norm in range(0, 1)
         mel = (mel - mel.min()) / (mel.max() - mel.min())
         # in range(0, 255)
-        mel = (mel * 255).astype(jnp.long)
+        mel = (mel * 255).astype(np.long)
         # [M, T // H, 3]
         mel = self.cmap[mel]
         # make origin lower
