@@ -45,7 +45,7 @@ class TrainWrapper:
         # [B, T]
         estim, _ = self.model.apply(params, diffusion, mel, timestep)
         # [B]
-        mse = jnp.square(noise - estim).sum(axis=-1)
+        mse = jnp.square(noise - estim).mean(axis=-1)
         # for derivatives of log-SNR
         def logsnr(time: jnp.ndarray):
             logsnr, _ = hooked_logsnr(self.model.logsnr, params['logsnr'], time)
