@@ -2,7 +2,6 @@ import flax
 import jax
 import jax.numpy as jnp
 
-from vlbdiffwave.hook import hooked_logsnr
 from vlbdiffwave.impl import VLBDiffWave
 
 
@@ -17,18 +16,12 @@ class TrainWrapper:
         self.model = diffwave
         self.gradient = jax.jit(jax.value_and_grad(self.compute_loss))
 
-    def reinit(self):
-        """Reinitialize.
-        """
-        self.model.logsnr.pipeline.memory = None
-
     def compute_loss(self,
                      params: flax.core.frozen_dict.FrozenDict,
                      signal: jnp.ndarray,
                      noise: jnp.ndarray,
                      mel: jnp.ndarray,
-                     timestep: jnp.ndarray,
-                     hook: bool = True) -> jnp.ndarray:
+                     timestep: jnp.ndarray) -> jnp.ndarray:
         """Compute noise estimation loss.
         Args:
             params: model prameters.
@@ -36,7 +29,6 @@ class TrainWrapper:
             noise: [float32; [B, T]], noise signal.
             mel: [float32; [B, T // H, M]], mel-spectrogram.
             timestep: [float32; [B]], input timestep.
-            hook: [bool, []], whether hook the logsnr or not.
         Returns:
             [float32; []], loss value.
         """
@@ -48,9 +40,7 @@ class TrainWrapper:
         mse = jnp.square(noise - estim).mean(axis=-1)
         # for derivatives of log-SNR
         def logsnr(time: jnp.ndarray):
-            # condition on hook for dlogsnr tensor trace error
-            logsnr, _ = hooked_logsnr(self.model.logsnr, params['logsnr'], time) \
-                if hook else self.model.logsnr.apply(params['logsnr'], time)
+            logsnr, _ = self.model.logsnr.apply(params['logsnr'], time)
             return logsnr.sum()
         # [B], dlog-SNR/dt
         dlogsnr = jax.grad(logsnr)(timestep)
@@ -58,6 +48,4 @@ class TrainWrapper:
         loss = -0.5 * dlogsnr * mse
         # []
         loss = loss.mean()
-        # set loss to the memory
-        self.model.logsnr.pipeline.memory = loss
         return loss

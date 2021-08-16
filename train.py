@@ -70,7 +70,7 @@ class Trainer:
             config.data.sr, config.data.fft, config.data.mel,
             config.data.fmin, config.data.fmax)
         
-        self.loss_fn = jax.jit(self.wrapper.compute_loss, static_argnames='hook')
+        self.loss_fn = jax.jit(self.wrapper.compute_loss)
         self.update_fn = self.jaxjit_update()
 
     def jaxjit_update(self) -> Callable:
@@ -121,7 +121,6 @@ class Trainer:
         for epoch in tqdm.trange(epoch, self.config.train.epoch):
             with tqdm.tqdm(total=len(self.trainset), leave=False) as pbar:
                 for it, (mel, speech) in enumerate(self.trainset):
-                    self.wrapper.reinit()
                     # split key
                     key, s1, s2 = jax.random.split(key, num=3)
                     # [B, T]
@@ -170,7 +169,7 @@ class Trainer:
                 # [B]
                 time = jax.random.uniform(s2, (speech.shape[0],))
                 # []
-                loss = self.loss_fn(self.app.param, speech, noise, mel, time, hook=False)
+                loss = self.loss_fn(self.app.param, speech, noise, mel, time)
                 # []
                 losses.append(loss)
             # test log

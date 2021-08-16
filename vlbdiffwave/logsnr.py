@@ -37,21 +37,10 @@ class PosDense(nn.Module):
         return x
 
 
-class Pipeline:
-    """Pipeline for bypassing submodule registeration.
-    """
-    def __init__(self):
-        """Initializer.
-        """
-        self.memory = None
-
-
 class LogSNR(nn.Module):
     """Learnable noise scheduler: logSNR.
     """
     internal: int
-    # pipeline
-    pipeline: Pipeline
     # initialize in range [-10, 10]
     # reference from Variational Diffusion Models, range of learned log-SNR.
     initial_gamma_min: float = -10.

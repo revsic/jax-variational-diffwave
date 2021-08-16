@@ -6,8 +6,7 @@ import jax.numpy as jnp
 
 from .config import Config
 from .diffwave import DiffWave
-from .hook import hooked_logsnr
-from .logsnr import LogSNR, Pipeline
+from .logsnr import LogSNR
 
 
 class VLBDiffWave:
@@ -19,7 +18,7 @@ class VLBDiffWave:
             config: model configuration.
         """
         self.diffwave = DiffWave(config=config)
-        self.logsnr = LogSNR(internal=config.internal, pipeline=Pipeline())
+        self.logsnr = LogSNR(internal=config.internal)
 
     def init(self,
              key: jnp.ndarray,
@@ -48,7 +47,7 @@ class VLBDiffWave:
             [float32; [B]], logSNR, normalized -logSNR, square of alpha and sigma.
         """
         # [B], [B]
-        logsnr, norm_nlogsnr = hooked_logsnr(self.logsnr, param, time)
+        logsnr, norm_nlogsnr = self.logsnr.apply(param, time)
         # [B]
         alpha_sq, sigma_sq = nn.sigmoid(logsnr), nn.sigmoid(-logsnr)
         return logsnr, norm_nlogsnr, alpha_sq, sigma_sq
