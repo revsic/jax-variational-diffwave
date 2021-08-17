@@ -204,10 +204,12 @@ class Trainer:
             ir: List[jnp.ndarray], steps x [float32; [T]],
                 intermediate represnetations.
         """
+        MAX_MELLEN = 160
         # [B, T // H, M], [B, T], [B], [B]
         mel, speech, mellen, speechlen = next(self.testset.dataset.as_numpy_iterator())
         # [1, T], steps x [1, T]
-        pred, ir = self.app(mel[0:1, :mellen[0]], timesteps, key=jax.random.PRNGKey(0))
+        pred, ir = self.app(mel[0:1, :min(mellen[0], MAX_MELLEN)],
+                            timesteps, key=jax.random.PRNGKey(0))
         # [T]
         pred = np.asarray(pred.squeeze(axis=0))
         # config.model.iter x [T]
