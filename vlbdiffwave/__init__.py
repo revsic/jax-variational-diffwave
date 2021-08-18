@@ -77,7 +77,7 @@ class VLBDiffWaveApp:
             denoised = self.model.denoise(
                 self.param, signal, mel, time_t[None], time_s[None])
             # stop trace ir and move to cpu memory for preventing oom
-            return denoised, np.asarray(jax.stop_gradient(denoised))
+            return denoised, np.asarray(jax.lax.stop_gradient(denoised))
         # [S, 2], 
         timesteps = jnp.stack([timesteps[:-1], timesteps[1:]], axis=1)
         # scan
