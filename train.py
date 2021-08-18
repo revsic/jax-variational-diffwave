@@ -147,17 +147,17 @@ class Trainer:
 
                         if (it + 1) % (len(self.trainset) // 10) == 0:
                             key, sub = jax.random.split(key)
-                            # [B, T]
-                            pred, _ = self.app(mel, timesteps, key=sub)
+                            # [1, T]
+                            pred, _ = self.app(mel[0:1], timesteps, key=sub)
                             # [T]
-                            pred = np.asarray(pred)[0]
+                            pred = np.asarray(pred).squeeze(0)
                             tf.summary.audio(
                                 'train/audio', pred[None, :, None], self.config.data.sr, step)
                             tf.summary.image(
                                 'train/mel', self.mel_img(pred)[None], step)
                             del pred
-                        
-                        del mel, speech, noise, time, loss, grad_norm, param_norm
+                    
+                    del mel, speech, noise, time, loss, grad_norm, param_norm
 
             self.app.write(
                 '{}_{}.ckpt'.format(self.ckpt_path, epoch), self.optim_state)
@@ -174,7 +174,7 @@ class Trainer:
                 loss = self.loss_fn(self.app.param, speech, noise, mel, time)
                 # []
                 losses.append(loss.item())
-                # delete mem
+                # remove 
                 del mel, speech, noise, time, loss
             # test log
             with self.test_log.as_default():
@@ -204,7 +204,7 @@ class Trainer:
         Returns:
             speech: [float32; [T]], ground truth.
             pred: [float32; [T]], predicted.
-            ir: List[jnp.ndarray], steps x [float32; [T]],
+            ir: List[np.ndarray], steps x [float32; [T]],
                 intermediate represnetations.
         """
         MAX_MELLEN = 160
@@ -215,7 +215,7 @@ class Trainer:
         # [T]
         pred = np.asarray(pred.squeeze(axis=0))
         # config.model.iter x [T]
-        ir = [np.asarray(i.squeeze(axis=0)) for i in ir]
+        ir = [i.squeeze(axis=0) for i in ir]
         return speech[0, :speechlen[0]], pred, ir
     
     def mel_fn(self, signal: np.ndarray) -> np.ndarray:
