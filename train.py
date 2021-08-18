@@ -118,8 +118,6 @@ class Trainer:
             timesteps: sampling steps.
         """
         step = epoch * len(self.trainset)
-        # [B]
-        timespace = jnp.linspace(0., 1., self.config.data.batch, endpoint=False)
         for epoch in tqdm.trange(epoch, self.config.train.epoch):
             with tqdm.tqdm(total=len(self.trainset), leave=False) as pbar:
                 for it, (mel, speech) in enumerate(self.trainset):
@@ -128,8 +126,10 @@ class Trainer:
                     key, s1, s2 = jax.random.split(key, num=3)
                     # [B, T]
                     noise = jax.random.normal(s1, speech.shape)
-                    # [B], for real uniform
-                    time = jnp.fmod(jax.random.uniform(s2) + timespace, 1.)
+                    # [B], sample uniformly
+                    time = jnp.linspace(0., 1., speech.shape, endpoint=False)
+                    # add start point
+                    time = jnp.fmod(jax.random.uniform(s2) + time, 1.)
                     # ([], [], []), FrozenDict, State
                     (loss, losses, grad_norm), self.app.param, self.optim_state = \
                         self.update_fn(self.app.param, self.optim_state,
