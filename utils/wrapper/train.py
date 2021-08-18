@@ -49,7 +49,8 @@ class TrainWrapper:
         # []
         prior_ll = self.likelihood(z1, jnp.zeros(1), jnp.ones(1)).mean()
         # []
-        prior_entropy = -self.likelihood(z1, alpha1[:, None] * signal, sigma1).mean()
+        prior_entropy = -self.likelihood(
+            z1, alpha1[:, None] * signal, sigma1[:, None]).mean()
         # []
         reconst = -self.likelihood(z0, signal).mean()
         # []
