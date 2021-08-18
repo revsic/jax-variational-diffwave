@@ -21,13 +21,14 @@ class VLBDiffWaveApp:
         self.config = config
         self.model = VLBDiffWave(config)
         self.param = None
+        self.denoiser = self.model.denoise
 
     def __call__(self,
                  mel: jnp.ndarray,
                  timesteps: Union[int, jnp.ndarray] = 10,
                  key: Optional[jnp.ndarray] = None,
                  noise: Optional[jnp.ndarray] = None) -> \
-            Tuple[jnp.ndarray, List[jnp.ndarray]]:
+            Tuple[jnp.ndarray, List[np.ndarray]]:
         """Generate audio from mel-spectrogram.
         Args:
             mel: [float32; [B, T // H, M]], condition mel-spectrogram.
@@ -51,36 +52,31 @@ class VLBDiffWaveApp:
         # scanning, outputs and intermediate representations
         return self.inference(mel, timesteps, noise)
 
-    def inference(self, mel: jnp.ndarray, timesteps: jnp.ndarray, noise: jnp.ndarray) -> \
-            Tuple[jnp.ndarray, List[jnp.ndarray]]:
+    def compile(self):
+        """Make denoiser just-in-time compiled.
+        """
+        self.denoiser = jax.jit(self.model.denoise)
+
+    def inference(self, mel: jnp.ndarray, timesteps: jnp.ndarray, signal: jnp.ndarray) -> \
+            Tuple[jnp.ndarray, List[np.ndarray]]:
         """Generate audio, just-in-time compiled.
         Args:
             mel: [float32; [B, T // H, M]], condition mel-spectrogram.
             timesteps: [float32; [S + 1]], time steps.
-            noise: [float32; [B, T]], starting noise.
-                neither key nor noise should be None.
+            signal: [float32; [B, T]], starting signal.
+                neither key nor signal should be None.
         Returns:
             [float32; [B, T]], generated audio and intermdeidate representations.
         """
-        def scanner(signal: jnp.ndarray, time: jnp.ndarray) -> \
-                Tuple[jnp.ndarray, jnp.ndarray]:
-            """Scanner for iterating timesteps and gradual denoising.
-            Args:
-                signal: [float32; [B, T]], speech signal.
-                time: [float32; [2]], current and next timesteps.
-            Returns:
-                [float32; [B, T]], denoised signal for both carry and outputs.
-            """
-            # [], []
-            time_t, time_s = time
+        ir = []
+        # [], []
+        for time_t, time_s in zip(timesteps[:-1], timesteps[1:]):
             # [B, T]
-            denoised = self.model.denoise(
-                self.param, signal, mel, time_t[None], time_s[None])
-            return denoised, denoised
-        # [S, 2], 
-        timesteps = jnp.stack([timesteps[:-1], timesteps[1:]], axis=1)
-        # scan
-        return jax.lax.scan(scanner, noise, timesteps)
+            signal = self.denoiser(self.param, signal, mel, time_t[None], time_s[None])
+            # write it as cpu array for preventing oom
+            ir.append(np.asarray(signal))
+        # [B, T], S x [B, T]
+        return signal, ir
 
     def init(self, key: np.ndarray):
         """Initialize model parameters.
