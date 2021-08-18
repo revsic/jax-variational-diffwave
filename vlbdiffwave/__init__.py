@@ -27,7 +27,7 @@ class VLBDiffWaveApp:
                  timesteps: Union[int, jnp.ndarray] = 10,
                  key: Optional[jnp.ndarray] = None,
                  noise: Optional[jnp.ndarray] = None) -> \
-            Tuple[jnp.ndarray, List[np.ndarray]]:
+            Tuple[jnp.ndarray, List[jnp.ndarray]]:
         """Generate audio from mel-spectrogram.
         Args:
             mel: [float32; [B, T // H, M]], condition mel-spectrogram.
@@ -52,7 +52,7 @@ class VLBDiffWaveApp:
         return self.inference(mel, timesteps, noise)
 
     def inference(self, mel: jnp.ndarray, timesteps: jnp.ndarray, noise: jnp.ndarray) -> \
-            Tuple[jnp.ndarray, List[np.ndarray]]:
+            Tuple[jnp.ndarray, List[jnp.ndarray]]:
         """Generate audio, just-in-time compiled.
         Args:
             mel: [float32; [B, T // H, M]], condition mel-spectrogram.
@@ -76,8 +76,7 @@ class VLBDiffWaveApp:
             # [B, T]
             denoised = self.model.denoise(
                 self.param, signal, mel, time_t[None], time_s[None])
-            # stop trace ir and move to cpu memory for preventing oom
-            return denoised, np.asarray(jax.lax.stop_gradient(denoised))
+            return denoised, denoised
         # [S, 2], 
         timesteps = jnp.stack([timesteps[:-1], timesteps[1:]], axis=1)
         # scan
