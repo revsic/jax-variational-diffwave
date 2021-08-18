@@ -148,10 +148,10 @@ class Trainer:
 
                         if (it + 1) % (len(self.trainset) // 10) == 0:
                             key, sub = jax.random.split(key)
-                            # [B, T]
-                            pred, _ = self.app(mel, timesteps, key=sub)
+                            # [1, T]
+                            pred, _ = self.app(mel[0:1], timesteps[0:1], key=sub)
                             # [T]
-                            pred = np.asarray(pred)[0]
+                            pred = np.asarray(pred).squeeze(0)
                             tf.summary.audio(
                                 'train/audio', pred[None, :, None], self.config.data.sr, step)
                             tf.summary.image(
