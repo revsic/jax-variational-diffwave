@@ -127,7 +127,7 @@ class Trainer:
                     # [B, T]
                     noise = jax.random.normal(s1, speech.shape)
                     # [B], sample uniformly
-                    time = jnp.linspace(0., 1., speech.shape, endpoint=False)
+                    time = jnp.linspace(0., 1., speech.shape[0], endpoint=False)
                     # add start point
                     time = jnp.fmod(jax.random.uniform(s2) + time, 1.)
                     # ([], [], []), FrozenDict, State
