@@ -109,7 +109,8 @@ class VLBDiffWave:
                   signal: jnp.ndarray,
                   noise: jnp.ndarray,
                   s: jnp.ndarray,
-                  t: Optional[jnp.ndarray] = None) -> jnp.ndarray:
+                  t: Optional[jnp.ndarray] = None) -> \
+            Tuple[jnp.ndarray, jnp.ndarray, jnp.ndarray]:
         """Add noise to signal.
         Args:
             param: model parameters.
@@ -119,7 +120,8 @@ class VLBDiffWave:
             t: [float32; [B]], target time in range[0, 1], s < t.
                 if t is None, compute q(z_t|x), otherwise, q(z_t|z_s).
         Returns:
-            [float32; [B, T]], noised signal.
+            alpha, sigma: [float32; [B]], signal, noise ratio.
+            noised: [float32; [B, T]], noised signal.
         """
         # B
         bsize = s.shape[0]
@@ -140,4 +142,6 @@ class VLBDiffWave:
         alpha = jnp.sqrt(jnp.maximum(alpha_sq, 1e-5))
         sigma = jnp.sqrt(jnp.maximum(sigma_sq, 1e-5))
         # [B, T]
-        return alpha[:, None] * signal + sigma[:, None] * noise
+        noised = alpha[:, None] * signal + sigma[:, None] * noise
+        # [B], [B], [B, T]
+        return alpha, sigma, noised

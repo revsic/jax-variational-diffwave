@@ -1,7 +1,7 @@
 import argparse
 import json
 import os
-from typing import Any, Callable, List, Tuple
+from typing import Any, Callable, Dict, List, Tuple
 
 import librosa
 
@@ -83,7 +83,7 @@ class Trainer:
                    mel: jnp.ndarray,
                    timestep: jnp.ndarray) -> \
                 Tuple[
-                    Tuple[jnp.ndarray, jnp.ndarray],
+                    Tuple[jnp.ndarray, Dict[str, jnp.ndarray], jnp.ndarray],
                     flax.core.frozen_dict.FrozenDict,
                     Any]:
             """Update function.
@@ -98,7 +98,7 @@ class Trainer:
                 udpated parameters and optimizer states.
             """
             # [], FrozenDict
-            loss, grads = self.wrapper.gradient(param, speech, noise, mel, timestep)
+            (loss, losses), grads = self.wrapper.gradient(param, speech, noise, mel, timestep)
             # optimizer update
             updates, optim_state = self.optim.update(grads, optim_state)
             # gradient update
@@ -106,7 +106,7 @@ class Trainer:
             # gradient norm
             gradnorm = jnp.array(
                 [jnp.linalg.norm(x) for x in jax.tree_util.tree_leaves(grads)]).mean()
-            return (loss, gradnorm), param, optim_state
+            return (loss, losses, gradnorm), param, optim_state
         # jit
         return jax.jit(update)
 
@@ -118,6 +118,8 @@ class Trainer:
             timesteps: sampling steps.
         """
         step = epoch * len(self.trainset)
+        # [B]
+        timespace = jnp.linspace(0., 1., self.config.data.batch, endpoint=False)
         for epoch in tqdm.trange(epoch, self.config.train.epoch):
             with tqdm.tqdm(total=len(self.trainset), leave=False) as pbar:
                 for it, (mel, speech) in enumerate(self.trainset):
@@ -125,10 +127,10 @@ class Trainer:
                     key, s1, s2 = jax.random.split(key, num=3)
                     # [B, T]
                     noise = jax.random.normal(s1, speech.shape)
-                    # [B]
-                    time = jax.random.uniform(s2, (speech.shape[0],))
-                    # ([], []), FrozenDict, State
-                    (loss, grad_norm), self.app.param, self.optim_state = \
+                    # [B], for real uniform
+                    time = jnp.fmod(jax.random.uniform(s2) + timespace, 1.)
+                    # ([], [], []), FrozenDict, State
+                    (loss, losses, grad_norm), self.app.param, self.optim_state = \
                         self.update_fn(self.app.param, self.optim_state,
                                        speech, noise, mel, time)
 
@@ -137,7 +139,9 @@ class Trainer:
                     pbar.set_postfix({'loss': loss.item(), 'step': step})
 
                     with self.train_log.as_default():
-                        tf.summary.scalar('common/loss', loss.item(), step)
+                        for name, loss in losses.items():
+                            tf.summary.scalar(f'common/{name}', loss.item(), step)
+
                         tf.summary.scalar('common/grad-norm', grad_norm.item(), step)
 
                         param_norm = np.mean(
@@ -157,7 +161,7 @@ class Trainer:
                                 'train/mel', self.mel_img(pred)[None], step)
                             del pred
                     
-                    del mel, speech, noise, time, loss, grad_norm, param_norm
+                    del mel, speech, noise, time, loss, losses, grad_norm, param_norm
 
             self.app.write(
                 '{}_{}.ckpt'.format(self.ckpt_path, epoch), self.optim_state)
