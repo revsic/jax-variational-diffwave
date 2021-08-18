@@ -52,7 +52,7 @@ class TrainWrapper:
         prior_entropy = -self.likelihood(
             z1, alpha1[:, None] * signal, sigma1[:, None]).mean()
         # []
-        reconst = -self.likelihood(z0, signal).mean()
+        reconst = -self.likelihood(z0, signal, jnp.ones(1)).mean()
         # []
         diffusion_loss = self.diffusion_loss(params, signal, noise, mel, timestep, hook)
         # []
