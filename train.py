@@ -173,8 +173,10 @@ class Trainer:
                 key, s1, s2 = jax.random.split(key, num=3)
                 # [B, T]
                 noise = jax.random.normal(s1, speech.shape)
-                # [B]
-                time = jax.random.uniform(s2, (speech.shape[0],))
+                # [B], sample uniformly
+                time = jnp.linspace(0., 1., speech.shape[0], endpoint=False)
+                # add start point
+                time = jnp.fmod(jax.random.uniform(s2) + time, 1.)
                 # []
                 _, lossdict = self.loss_fn(
                     self.app.param, speech, noise, mel, time, hook=False)
