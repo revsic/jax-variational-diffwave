@@ -168,7 +168,7 @@ class Trainer:
                 '{}_{}.ckpt'.format(self.ckpt_path, epoch), self.optim_state)
 
             # test loss
-            losses = []
+            losses = {}
             for mel, speech in tqdm.tqdm(self.testset, leave=False):
                 key, s1, s2 = jax.random.split(key, num=3)
                 # [B, T]
@@ -176,14 +176,19 @@ class Trainer:
                 # [B]
                 time = jax.random.uniform(s2, (speech.shape[0],))
                 # []
-                loss = self.loss_fn(self.app.param, speech, noise, mel, time, hook=False)
-                # []
-                losses.append(loss.item())
+                _, lossdict = self.loss_fn(
+                    self.app.param, speech, noise, mel, time, hook=False)
+                # update dict
+                for name, loss in lossdict.items():
+                    if name not in losses:
+                        losses[name] = []
+                    losses[name].append(loss.item())
                 # remove 
-                del mel, speech, noise, time, loss
+                del mel, speech, noise, time, loss, lossdict
             # test log
             with self.test_log.as_default():
-                tf.summary.scalar('common/loss', np.mean(losses), step)
+                for name, loss in losses.items():
+                    tf.summary.scalar(f'common/{name}', np.mean(loss), step)
 
                 gt, pred, ir = self.eval(timesteps)
                 tf.summary.audio(
