@@ -105,11 +105,13 @@ class VLBDiffWaveApp:
             with open(f'{name}_optim{ext}', 'wb') as f:
                 f.write(flax.serialization.to_bytes(optim))
 
-    def restore(self, path: str, optim: Optional[Any] = None):
+    def restore(self, path: str, optim: Optional[Any] = None) -> Optional[Any]:
         """Restore model parameters from `path` checkpoint.
         Args:
             path: path to the checkpoint.
             optim: optimizer state, if provided.
+        Returns:
+            loaded optimizer states if provided
         """
         with open(path, 'rb') as f:
             binary = f.read()
@@ -117,11 +119,13 @@ class VLBDiffWaveApp:
             # initialize parameters with dummy key.
             self.init(jax.random.PRNGKey(0))
         # restore
-        flax.serialization.from_bytes(self.param, binary)
+        self.param = flax.serialization.from_bytes(self.param, binary)
         # auxiliary restoration
         if optim is not None:
             name, ext = os.path.splitext(path)
             with open(f'{name}_optim{ext}', 'rb') as f:
                 binary = f.read()
             # restore
-            flax.serialization.from_bytes(optim, binary)
+            return flax.serialization.from_bytes(optim, binary)
+        # explicit returns
+        return None

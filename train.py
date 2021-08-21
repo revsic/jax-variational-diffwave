@@ -325,7 +325,7 @@ if __name__ == '__main__':
             config.train.name,
             f'{config.train.name}_{args.load_epoch}.ckpt')
         # load checkpoint
-        diffwave.restore(ckpt_path, trainer.optim_state)
+        trainer.optim_state = diffwave.restore(ckpt_path, trainer.optim_state)
         print('[*] load checkpoint: ' + ckpt_path)
         # since epoch starts with 0
         args.load_epoch += 1
