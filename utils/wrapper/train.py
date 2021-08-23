@@ -39,35 +39,35 @@ class TrainWrapper:
         _, _, z0 = self.model.diffusion(params, signal, noise, jnp.zeros(timestep.shape))
         # [B], [B], [B, T]
         alpha1, sigma1, z1 = self.model.diffusion(params, signal, noise, jnp.ones(timestep.shape))
+        # [], standard gaussian negative log-likelihood
+        prior_loss = jnp.square(z1).mean()
         # []
-        prior_ll = self.likelihood(z1, jnp.zeros(1), jnp.ones(1)).mean()
-        # []
-        prior_entropy = -self.likelihood(
+        prior_entropy = self.nll(
             z1, alpha1[:, None] * signal, sigma1[:, None]).mean()
         # []
-        reconst = -self.likelihood(z0, signal, jnp.ones(1)).mean()
+        reconst = jnp.square(z0 - signal).mean()
         # []
         diffusion_loss = self.diffusion_loss(params, signal, noise, mel, timestep)
         # []
-        # , minimize: reconstruction, diffusion loss
-        # , maximize: prior likelihood, prior entropy
-        loss = reconst + diffusion_loss - prior_ll - prior_entropy
+        loss = reconst + diffusion_loss + prior_loss - prior_entropy
         return loss, {
             'loss': loss,
             'reconst': reconst, 'diffusion': diffusion_loss,
-            'prior-ll': prior_ll, 'prior-entropy': prior_entropy}
+            'prior': prior_loss, 'prior-entropy': prior_entropy}
 
-    def likelihood(self, sample: jnp.ndarray, mean: jnp.ndarray, std: jnp.ndarray) -> jnp.ndarray:
-        """Compute point-wise gaussian likelihood.
+    def nll(self, sample: jnp.ndarray, mean: jnp.ndarray, std: jnp.ndarray) -> jnp.ndarray:
+        """Compute point-wise gaussian negative log-likelihood.
         Args:
             sample: [float32; [...]], data sample.
             mean: [float32; [...]], gaussian mean.
             std: [float32; [...]], gaussian standard deviation, positive real.
+        Returns:
+            [float32; [...]], nll.
         """
         # [...]
         logstd = jnp.log(jnp.maximum(std, 1e-5))
         # [...]
-        return -0.5 * (jnp.log(2 * jnp.pi) + 2 * logstd + std ** -2 * (sample - mean) ** 2)
+        return 2 * logstd + std ** -2 * (sample - mean) ** 2
 
     def diffusion_loss(self,
                        params: flax.core.frozen_dict.FrozenDict,
