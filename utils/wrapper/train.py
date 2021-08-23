@@ -43,9 +43,10 @@ class TrainWrapper:
         (loss, losses), grads = self.gradient_fn(params, signal, noise, mel, timestep)
         # compute squared loss for snr interpolation parameters
         interp = {
-            key: 2 * loss * val
+            key: val
             for key, val in grads['logsnr']['params'].items()
             if not key.startswith('gamma')}
+        interp = jax.tree_map(lambda p: 2 * loss * p, interp)
         # udpate gradients
         grads = flax.core.freeze({
             'diffwave': grads['diffwave'],
