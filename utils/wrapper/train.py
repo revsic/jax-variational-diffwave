@@ -16,7 +16,41 @@ class TrainWrapper:
             diffwave: Target model.
         """
         self.model = diffwave
-        self.gradient = jax.jit(jax.value_and_grad(self.compute_loss, has_aux=True))
+        self.gradient_fn = jax.jit(jax.value_and_grad(self.compute_loss, has_aux=True))
+
+    def gradient(self,
+                 params: flax.core.frozen_dict.FrozenDict,
+                 signal: jnp.ndarray,
+                 noise: jnp.ndarray,
+                 mel: jnp.ndarray,
+                 timestep: jnp.ndarray) -> \
+            Tuple[
+                Tuple[jnp.ndarray, Dict[str, jnp.ndarray]],
+                flax.core.frozen_dict.FrozenDict]:
+        """Compute gradient with MC-variance regularizing loss.
+        Args:
+            param: model parameters.
+            speech: [float32; [B, T]], speech signal.
+            noise: [float32; [B, T]], sampled noise.
+            mel: [float32; [B, T // H, M]], mel-spectrogram.
+            timestep: [float32; [B]], timesteps.
+        Returns:
+            loss: [float32; []], total loss.
+            losses: [float32; []], loss values for summary.
+            grads: gradients for each parameters.
+        """
+        # [], FrozenDict, FrozenDict
+        (loss, losses), grads = self.gradient_fn(params, signal, noise, mel, timestep)
+        # compute squared loss for snr interpolation parameters
+        interp = {
+            key: 2 * loss * val
+            for key, val in grads['logsnr']['params'].items()
+            if not key.startswith('gamma')}
+        # udpate gradients
+        grads = flax.core.freeze({
+            'diffwave': grads['diffwave'],
+            'logsnr': {'params': {**grads['logsnr']['params'], **interp}}})
+        return (loss, losses), grads
 
     def compute_loss(self,
                      params: flax.core.frozen_dict.FrozenDict,
