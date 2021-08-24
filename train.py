@@ -276,6 +276,7 @@ if __name__ == '__main__':
     parser.add_argument('--seed', default=0, type=int)
     parser.add_argument('--config', default=None)
     parser.add_argument('--load-epoch', default=0, type=int)
+    parser.add_argument('--timesteps', default=10, type=int)
     parser.add_argument('--data-dir', default=None)
     parser.add_argument('--download', default=False, action='store_true')
     parser.add_argument('--from-raw', default=False, action='store_true')
@@ -337,4 +338,4 @@ if __name__ == '__main__':
         json.dump(config.dump(), f)
 
     # start train
-    trainer.train(key, args.load_epoch)
+    trainer.train(key, args.load_epoch, args.timesteps)
