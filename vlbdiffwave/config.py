@@ -8,6 +8,9 @@ class Config:
         """
         self.hop = hop
 
+        # fourier features
+        self.fourier = [7, 8]
+
         # embedding config
         self.embedding_size = 128
         self.embedding_proj = 512

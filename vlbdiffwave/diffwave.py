@@ -15,6 +15,8 @@ class DiffWave(nn.Module):
         """Setup modules.
         """
         config = self.config
+        # [F], fourier coefficient
+        self.fcoeff = 2 ** jnp.array(config.fourier)
         # signal proj
         self.proj = nn.Dense(config.channels)
         # embedding
@@ -56,8 +58,12 @@ class DiffWave(nn.Module):
         Returns:
             [float32; [B, T]], estimated noise.
         """
+        # [B, T, F], fourier features
+        x = self.fcoeff * signal[..., None]
+        # [B, T, F x 2 + 1]
+        x = jnp.concatenate([signal[..., None], jnp.sin(x), jnp.cos(x)], dim=-1)
         # [B, T, C]
-        x = nn.swish(self.proj(signal[..., None]))
+        x = nn.swish(self.proj(x))
         # [B, E']
         embed = self.embedding(snr)
         # [B, E]
