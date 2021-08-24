@@ -22,6 +22,8 @@ from speechset.datasets import LJSpeech
 from utils.wrapper import DatasetWrapper, TrainWrapper
 from vlbdiffwave import VLBDiffWaveApp
 
+IR_INTERVAL = 5
+
 
 class Trainer:
     """DiffWave trainer.
@@ -201,7 +203,8 @@ class Trainer:
                 tf.summary.image(
                     'eval/mel', self.mel_img(pred)[None], step)
 
-                for i in range(timesteps):
+                interval = 1 if timesteps < IR_INTERVAL else timesteps // IR_INTERVAL
+                for i in range(0, timesteps, interval):
                     tf.summary.image(f'eval/ir{i}', self.mel_img(ir[i])[None], step)
 
                 del gt, pred, ir
