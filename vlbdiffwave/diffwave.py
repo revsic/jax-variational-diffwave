@@ -61,7 +61,7 @@ class DiffWave(nn.Module):
         # [B, T, F], fourier features
         x = self.fcoeff * signal[..., None]
         # [B, T, F x 2 + 1]
-        x = jnp.concatenate([signal[..., None], jnp.sin(x), jnp.cos(x)], dim=-1)
+        x = jnp.concatenate([signal[..., None], jnp.sin(x), jnp.cos(x)], axis=-1)
         # [B, T, C]
         x = nn.swish(self.proj(x))
         # [B, E']
