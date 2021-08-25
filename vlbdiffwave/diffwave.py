@@ -59,7 +59,7 @@ class DiffWave(nn.Module):
             [float32; [B, T]], estimated noise.
         """
         # [B, T, F], fourier features
-        x = self.fcoeff * signal[..., None]
+        x = self.fcoeff * signal[..., None] * jnp.pi
         # [B, T, F x 2 + 1]
         x = jnp.concatenate([signal[..., None], jnp.sin(x), jnp.cos(x)], axis=-1)
         # [B, T, C]
