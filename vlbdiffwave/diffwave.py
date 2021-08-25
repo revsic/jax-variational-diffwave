@@ -23,8 +23,6 @@ class DiffWave(nn.Module):
         self.proj_embed = [
             nn.Dense(config.embedding_proj)
             for _ in range(config.embedding_layers)]
-        self.embedding_factor = self.param(
-            'embedding_factor', constant(float(config.embedding_factor)), [])
         # mel-upsampler
         self.upsample = [
             nn.ConvTranspose(
@@ -64,8 +62,11 @@ class DiffWave(nn.Module):
         x = jnp.concatenate([signal[..., None], jnp.sin(x), jnp.cos(x)], axis=-1)
         # [B, T, C]
         x = nn.swish(self.proj(x))
+        # []
+        factor = self.param(
+            'factor', constant(float(self.config.embedding_factor)), [])
         # [B, E']
-        embed = self.embedding(snr)
+        embed = self.embedding(snr, factor)
         # [B, E]
         for proj in self.proj_embed:
             embed = nn.swish(proj(embed))
@@ -86,7 +87,7 @@ class DiffWave(nn.Module):
         # [B, T]
         return nn.tanh(self.proj_out(context)).squeeze(-1)
 
-    def embedding(self, snr: jnp.ndarray) -> jnp.ndarray:
+    def embedding(self, snr: jnp.ndarray, factor: jnp.ndarray) -> jnp.ndarray:
         """Generate embedding.
         Args:
             snr: [float32; [B]], unit normalized signal-to-noise ratio.
@@ -98,7 +99,7 @@ class DiffWave(nn.Module):
         # [E // 2]
         denom = jnp.exp(-jnp.log(10000) * i / self.config.embedding_size)
         # [B, E // 2]
-        context = snr[:, None] * denom[None] * self.embedding_factor
+        context = snr[:, None] * denom[None] * factor
         # [B, E // 2, 2]
         pe = jnp.stack([jnp.sin(context), jnp.cos(context)], axis=-1)
         # [B, E]
