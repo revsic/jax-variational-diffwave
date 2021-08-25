@@ -13,7 +13,7 @@ class TrainConfig:
         # optimizer
         self.learning_rate = 2e-4
         self.beta1 = 0.9
-        self.beta2 = 0.98
+        self.beta2 = 0.99
         self.eps = 1e-9
 
         # 13000:100
