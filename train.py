@@ -154,7 +154,6 @@ class Trainer:
                         if (it + 1) % (len(self.trainset) // 10) == 0:
                             key, sub = jax.random.split(key)
                             # [1, T]
-                            self.app.compile()
                             pred, _ = self.app(mel[0:1], timesteps, key=sub, use_tqdm=True)
                             # [T]
                             pred = np.asarray(pred).squeeze(0)
@@ -225,7 +224,6 @@ class Trainer:
         # [B, T // H, M], [B, T], [B], [B]
         mel, speech, mellen, speechlen = next(self.testset.dataset.as_numpy_iterator())
         # [1, T], steps x [1, T]
-        self.app.compile()
         pred, ir = self.app(
             mel[0:1, :min(mellen[0], MAX_MELLEN)], timesteps,
             key=jax.random.PRNGKey(0), use_tqdm=True)
