@@ -29,7 +29,7 @@ class VLBDiffWaveApp:
                  timesteps: Union[int, jnp.ndarray] = 10,
                  key: Optional[jnp.ndarray] = None,
                  noise: Optional[jnp.ndarray] = None,
-                 tqdm: bool = False) -> \
+                 use_tqdm: bool = False) -> \
             Tuple[jnp.ndarray, List[np.ndarray]]:
         """Generate audio from mel-spectrogram.
         Args:
@@ -38,7 +38,7 @@ class VLBDiffWaveApp:
             key: jax random prng key.
             noise: [float32; [B, T]], starting noise.
                 neither key nor noise should be None.
-            tqdm: whether use tqdm on iteration or not.
+            use_tqdm: whether use tqdm on iteration or not.
         Returns:
             [float32; [B, T]], generated audio and intermediate representations.
         """
@@ -55,7 +55,7 @@ class VLBDiffWaveApp:
             # [S]
             timesteps = jnp.linspace(1., 0., timesteps + 1)
         # scanning, outputs and intermediate representations
-        return self.inference(mel, timesteps, noise, key, tqdm)
+        return self.inference(mel, timesteps, noise, key, use_tqdm)
 
     def compile(self):
         """Make denoiser just-in-time compiled.
@@ -67,7 +67,7 @@ class VLBDiffWaveApp:
                   timesteps: jnp.ndarray,
                   signal: jnp.ndarray,
                   key: Optional[jnp.ndarray] = None,
-                  tqdm: bool = False) -> \
+                  use_tqdm: bool = False) -> \
             Tuple[jnp.ndarray, List[np.ndarray]]:
         """Generate audio, just-in-time compiled.
         Args:
@@ -77,7 +77,7 @@ class VLBDiffWaveApp:
                 neither key nor signal should be None.
             key: jax random key.
                 if not provided, inference with mean only.
-            tqdm: whether use tqdm for iteration visualization or not.
+            use_tqdm: whether use tqdm for iteration visualization or not.
         Returns:
             [float32; [B, T]], generated audio and intermdeidate representations.
         """
