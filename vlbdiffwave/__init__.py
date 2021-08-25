@@ -22,7 +22,8 @@ class VLBDiffWaveApp:
         self.config = config
         self.model = VLBDiffWave(config)
         self.param = None
-        self.denoiser = self.model.denoise
+        # since `denoise` is stateless, pre-jit is available
+        self.denoiser = jax.jit(self.model.denoise)
 
     def __call__(self,
                  mel: jnp.ndarray,
@@ -56,11 +57,6 @@ class VLBDiffWaveApp:
             timesteps = jnp.linspace(1., 0., timesteps + 1)
         # scanning, outputs and intermediate representations
         return self.inference(mel, timesteps, noise, key, use_tqdm)
-
-    def compile(self):
-        """Make denoiser just-in-time compiled.
-        """
-        self.denoiser = jax.jit(self.model.denoise)
 
     def inference(self,
                   mel: jnp.ndarray,
