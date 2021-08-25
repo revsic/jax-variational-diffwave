@@ -83,7 +83,7 @@ class VLBDiffWaveApp:
         """
         iterator = zip(timesteps[:-1], timesteps[1:])
         # use tqdm iterator
-        if tqdm:
+        if use_tqdm:
             iterator = tqdm(iterator, total=len(timesteps) - 1, leave=False)
         # S x [B, T]
         ir = []
