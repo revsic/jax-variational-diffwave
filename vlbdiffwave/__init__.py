@@ -88,7 +88,7 @@ class VLBDiffWaveApp:
                 # split
                 key, sub = jax.random.split(key)
                 # [B, T]
-                signal = mean + jnp.random.normal(sub, shape=mean.shape) * std[:, None]
+                signal = mean + jax.random.normal(sub, shape=mean.shape) * std[:, None]
             # write it as cpu array for preventing oom
             ir.append(np.asarray(signal))
         # [B, T], S x [B, T]
