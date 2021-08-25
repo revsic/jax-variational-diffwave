@@ -5,6 +5,7 @@ import jax
 import jax.numpy as jnp
 import flax
 import numpy as np
+from tqdm import tqdm
 
 from .config import Config
 from .impl import VLBDiffWave
@@ -27,7 +28,8 @@ class VLBDiffWaveApp:
                  mel: jnp.ndarray,
                  timesteps: Union[int, jnp.ndarray] = 10,
                  key: Optional[jnp.ndarray] = None,
-                 noise: Optional[jnp.ndarray] = None) -> \
+                 noise: Optional[jnp.ndarray] = None,
+                 tqdm: bool = False) -> \
             Tuple[jnp.ndarray, List[np.ndarray]]:
         """Generate audio from mel-spectrogram.
         Args:
@@ -36,6 +38,7 @@ class VLBDiffWaveApp:
             key: jax random prng key.
             noise: [float32; [B, T]], starting noise.
                 neither key nor noise should be None.
+            tqdm: whether use tqdm on iteration or not.
         Returns:
             [float32; [B, T]], generated audio and intermediate representations.
         """
@@ -52,7 +55,7 @@ class VLBDiffWaveApp:
             # [S]
             timesteps = jnp.linspace(1., 0., timesteps + 1)
         # scanning, outputs and intermediate representations
-        return self.inference(mel, timesteps, noise, key)
+        return self.inference(mel, timesteps, noise, key, tqdm)
 
     def compile(self):
         """Make denoiser just-in-time compiled.
@@ -63,7 +66,8 @@ class VLBDiffWaveApp:
                   mel: jnp.ndarray,
                   timesteps: jnp.ndarray,
                   signal: jnp.ndarray,
-                  key: Optional[jnp.ndarray] = None) -> \
+                  key: Optional[jnp.ndarray] = None,
+                  tqdm: bool = False) -> \
             Tuple[jnp.ndarray, List[np.ndarray]]:
         """Generate audio, just-in-time compiled.
         Args:
@@ -73,12 +77,18 @@ class VLBDiffWaveApp:
                 neither key nor signal should be None.
             key: jax random key.
                 if not provided, inference with mean only.
+            tqdm: whether use tqdm for iteration visualization or not.
         Returns:
             [float32; [B, T]], generated audio and intermdeidate representations.
         """
+        iterator = zip(timesteps[:-1], timesteps[1:])
+        # use tqdm iterator
+        if tqdm:
+            iterator = tqdm(iterator, total=len(timesteps) - 1, leave=False)
+        # S x [B, T]
         ir = []
         # [], []
-        for time_t, time_s in zip(timesteps[:-1], timesteps[1:]):
+        for time_t, time_s in iterator:
             # [B, T], [B]
             mean, std = self.denoiser(self.param, signal, mel, time_t[None], time_s[None])
             if key is None:
