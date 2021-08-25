@@ -42,22 +42,28 @@ class VLBDiffWaveApp:
         # assertion
         assert key is not None or noise is not None
         if noise is None:
+            # split
+            key, sub = jax.random.split(key)
             # B, T // H, _
             bsize, mellen, _ = mel.shape
             # [B, T]
-            noise = jax.random.normal(key, shape=(bsize, mellen * self.config.hop))
+            noise = jax.random.normal(sub, shape=(bsize, mellen * self.config.hop))
         if isinstance(timesteps, int):
             # [S]
             timesteps = jnp.linspace(1., 0., timesteps + 1)
         # scanning, outputs and intermediate representations
-        return self.inference(mel, timesteps, noise)
+        return self.inference(mel, timesteps, noise, key)
 
     def compile(self):
         """Make denoiser just-in-time compiled.
         """
         self.denoiser = jax.jit(self.model.denoise)
 
-    def inference(self, mel: jnp.ndarray, timesteps: jnp.ndarray, signal: jnp.ndarray) -> \
+    def inference(self,
+                  mel: jnp.ndarray,
+                  timesteps: jnp.ndarray,
+                  signal: jnp.ndarray,
+                  key: Optional[jnp.ndarray] = None) -> \
             Tuple[jnp.ndarray, List[np.ndarray]]:
         """Generate audio, just-in-time compiled.
         Args:
@@ -65,14 +71,24 @@ class VLBDiffWaveApp:
             timesteps: [float32; [S + 1]], time steps.
             signal: [float32; [B, T]], starting signal.
                 neither key nor signal should be None.
+            key: jax random key.
+                if not provided, inference with mean only.
         Returns:
             [float32; [B, T]], generated audio and intermdeidate representations.
         """
         ir = []
         # [], []
         for time_t, time_s in zip(timesteps[:-1], timesteps[1:]):
-            # [B, T]
-            signal = self.denoiser(self.param, signal, mel, time_t[None], time_s[None])
+            # [B, T], [B]
+            mean, std = self.denoiser(self.param, signal, mel, time_t[None], time_s[None])
+            if key is None:
+                # mean only
+                signal = mean
+            else:
+                # split
+                key, sub = jax.random.split(key)
+                # [B, T]
+                signal = mean + jnp.random.normal(sub, shape=mean.shape) * std[:, None]
             # write it as cpu array for preventing oom
             ir.append(np.asarray(signal))
         # [B, T], S x [B, T]
