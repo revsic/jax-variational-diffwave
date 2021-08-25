@@ -78,7 +78,7 @@ class VLBDiffWave:
                 signal: jnp.ndarray,
                 mel: jnp.ndarray,
                 t: jnp.ndarray,
-                s: Optional[jnp.ndarray] = None) -> jnp.ndarray:
+                s: jnp.ndarray) -> Tuple[jnp.ndarray, jnp.ndarray]:
         """Denoise process.
         Args:
             param: model parameters.
@@ -86,23 +86,24 @@ class VLBDiffWave:
             mel: [float32; [B, T // H, M]], mel-spectrogram.
             t: [float32; [B]], target time in range[0, 1].
             s: [float32; [B]], start time in range[0, 1], s < t.
-                if s is None, compute p(z_t), otherwise, p(z_s|z_t).
         Returns:
-            [float32; [B, T]], denoised signal.
+            mean: [float32; [B, T]], denoised signal mean.
+            std: [float32; [B]], standard deviation.
         """
         # [B, T], [B], [B]
-        noise, (alpha_sq, sigma_sq) = self.apply(param, signal, mel, t)
-        if s is not None:
-            # [B] x 2
-            _, _, alpha_sq_s, sigma_sq_s = self.snr(param['logsnr'], s)
-            # [B]
-            alpha_sq_tbars = alpha_sq / alpha_sq_s
-            sigma_sq_tbars = sigma_sq - alpha_sq_tbars * sigma_sq_s
-            # [B]
-            alpha_sq = alpha_sq_tbars
-            sigma_sq = sigma_sq_tbars ** 2 / sigma_sq
-        # denoise
-        return 1 / jnp.sqrt(alpha_sq) * (signal - jnp.sqrt(sigma_sq) * noise)
+        noise, (alpha_sq_t, sigma_sq_t) = self.apply(param, signal, mel, t)
+        # [B] x 2
+        _, _, alpha_sq_s, sigma_sq_s = self.snr(param['logsnr'], s)
+        # [B]
+        alpha_sq_tbars = alpha_sq_t / alpha_sq_s
+        sigma_sq_tbars = sigma_sq_t - alpha_sq_tbars * sigma_sq_s
+        # [B]
+        std = jnp.sqrt(sigma_sq_tbars * sigma_sq_s / sigma_sq_t)
+        # [B, T]
+        mean = 1 / jnp.sqrt(alpha_sq_tbars[:, None]) * (
+            signal - sigma_sq_tbars[:, None] / jnp.sqrt(sigma_sq_t[:, None]) * noise)
+        # [B, T], [B]
+        return mean, std
 
     def diffusion(self,
                   param: flax.core.frozen_dict.FrozenDict,
