@@ -155,7 +155,7 @@ class Trainer:
                             key, sub = jax.random.split(key)
                             # [1, T]
                             self.app.compile()
-                            pred, _ = self.app(mel[0:1], timesteps, key=sub, tqdm=True)
+                            pred, _ = self.app(mel[0:1], timesteps, key=sub, use_tqdm=True)
                             # [T]
                             pred = np.asarray(pred).squeeze(0)
                             tf.summary.audio(
@@ -228,7 +228,7 @@ class Trainer:
         self.app.compile()
         pred, ir = self.app(
             mel[0:1, :min(mellen[0], MAX_MELLEN)], timesteps,
-            key=jax.random.PRNGKey(0), tqdm=True)
+            key=jax.random.PRNGKey(0), use_tqdm=True)
         # [T]
         pred = np.asarray(pred.squeeze(axis=0))
         # config.model.iter x [T]
