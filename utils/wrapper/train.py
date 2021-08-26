@@ -80,7 +80,7 @@ class TrainWrapper:
         prior_entropy = self.nll(
             z1, alpha1[:, None] * signal, sigma1[:, None]).mean()
         # []
-        reconst = jnp.square(z0 - signal).mean()
+        reconst = jnp.abs(z0 - signal).mean()
         # []
         diffusion_loss = self.diffusion_loss(params, signal, noise, mel, timestep)
         # []
@@ -125,7 +125,7 @@ class TrainWrapper:
         # [B, T]
         estim, _ = self.model.apply(params, diffusion, mel, timestep)
         # [B]
-        mse = jnp.square(noise - estim).mean(axis=-1)
+        mae = jnp.abs(noise - estim).mean(axis=-1)
         # for derivatives of log-SNR
         def logsnr(time: jnp.ndarray):
             logsnr, _ = self.model.logsnr.apply(params['logsnr'], time)
@@ -133,7 +133,7 @@ class TrainWrapper:
         # [B], dlog-SNR/dt
         dlogsnr = jax.grad(logsnr)(timestep)
         # [B]
-        loss = -0.5 * dlogsnr * mse
+        loss = -0.5 * dlogsnr * mae
         # []
         loss = loss.mean()
         return loss
