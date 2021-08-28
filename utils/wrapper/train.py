@@ -82,12 +82,12 @@ class TrainWrapper:
         # []
         reconst = jnp.abs(z0 - signal).mean()
         # []
-        diffusion_loss = self.diffusion_loss(params, signal, noise, mel, timestep)
+        diffusion_loss, err = self.diffusion_loss(params, signal, noise, mel, timestep)
         # []
         loss = reconst + diffusion_loss + prior_loss - prior_entropy
         return loss, {
             'loss': loss,
-            'reconst': reconst, 'diffusion': diffusion_loss,
+            'reconst': reconst, 'diffusion': diffusion_loss, 'err': err,
             'prior': prior_loss, 'prior-entropy': prior_entropy,
             'gamma-min': params['logsnr']['params']['gamma_min'],
             'gamma-gap': params['logsnr']['params']['gamma_gap']}
@@ -111,7 +111,7 @@ class TrainWrapper:
                        signal: jnp.ndarray,
                        noise: jnp.ndarray,
                        mel: jnp.ndarray,
-                       timestep: jnp.ndarray) -> jnp.ndarray:
+                       timestep: jnp.ndarray) -> Tuple[jnp.ndarray, jnp.ndarray]:
         """Compute noise estimation loss.
         Args:
             params: model prameters.
@@ -120,7 +120,7 @@ class TrainWrapper:
             mel: [float32; [B, T // H, M]], mel-spectrogram.
             timestep: [float32; [B]], input timestep.
         Returns:
-            [float32; []], loss value.
+            [float32; []], loss value and mae.
         """
         # [B, T]
         _, _, diffusion = self.model.diffusion(params, signal, noise, timestep)
@@ -138,4 +138,4 @@ class TrainWrapper:
         loss = -0.5 * dlogsnr * mae
         # []
         loss = loss.mean()
-        return loss
+        return loss, mae.mean()
