@@ -88,7 +88,9 @@ class TrainWrapper:
         return loss, {
             'loss': loss,
             'reconst': reconst, 'diffusion': diffusion_loss,
-            'prior': prior_loss, 'prior-entropy': prior_entropy}
+            'prior': prior_loss, 'prior-entropy': prior_entropy,
+            'gamma-min': params['logsnr']['params']['gamma_min'],
+            'gamma-gap': params['logsnr']['params']['gamma_gap']}
 
     def nll(self, sample: jnp.ndarray, mean: jnp.ndarray, std: jnp.ndarray) -> jnp.ndarray:
         """Compute point-wise gaussian negative log-likelihood.
