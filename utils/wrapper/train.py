@@ -75,7 +75,7 @@ class TrainWrapper:
         # [B], [B], [B, T]
         alpha1, sigma1, z1 = self.model.diffusion(params, signal, noise, jnp.ones(timestep.shape))
         # [], standard gaussian negative log-likelihood
-        prior_loss = jnp.square(z1).mean()
+        prior_loss = jnp.square(z1 - noise).mean()
         # []
         prior_entropy = self.nll(
             z1, alpha1[:, None] * signal, sigma1[:, None]).mean()
