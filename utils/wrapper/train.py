@@ -73,22 +73,19 @@ class TrainWrapper:
         # [B, T]
         _, _, z0 = self.model.diffusion(params, signal, noise, jnp.zeros(timestep.shape))
         # [B], [B], [B, T]
-        alpha1, sigma1, z1 = self.model.diffusion(params, signal, noise, jnp.ones(timestep.shape))
+        _, _, z1 = self.model.diffusion(params, signal, noise, jnp.ones(timestep.shape))
         # [], standard gaussian negative log-likelihood
         prior_loss = jnp.square(z1 - noise).mean()
-        # []
-        prior_entropy = self.nll(
-            z1, alpha1[:, None] * signal, sigma1[:, None]).mean()
         # []
         reconst = jnp.square(z0 - signal).mean()
         # []
         diffusion_loss, err = self.diffusion_loss(params, signal, noise, mel, timestep)
         # []
-        loss = reconst + err + diffusion_loss + prior_loss - prior_entropy
+        loss = reconst + err + diffusion_loss + prior_loss
         return loss, {
             'loss': loss,
-            'reconst': reconst, 'diffusion': diffusion_loss, 'err': err,
-            'prior': prior_loss, 'prior-entropy': prior_entropy,
+            'reconst': reconst, 'prior': prior_loss,
+            'diffusion': diffusion_loss, 'err': err,
             'gamma-min': params['logsnr']['params']['gamma_min'],
             'gamma-gap': params['logsnr']['params']['gamma_gap']}
 
