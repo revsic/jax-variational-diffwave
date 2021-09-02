@@ -81,7 +81,7 @@ class TrainWrapper:
         # []
         diffusion_loss, err = self.diffusion_loss(params, signal, noise, mel, timestep)
         # []
-        loss = reconst + err + diffusion_loss + prior_loss
+        loss = reconst + err + 0.001 * diffusion_loss + prior_loss
         return loss, {
             'loss': loss,
             'reconst': reconst, 'prior': prior_loss,
