@@ -15,7 +15,7 @@ class Config:
         self.embedding_size = 128
         self.embedding_proj = 512
         self.embedding_layers = 2
-        self.embedding_factor = 128
+        self.embedding_factor = 10000
 
         # upsampler config
         self.upsample_strides = [16, 1]
