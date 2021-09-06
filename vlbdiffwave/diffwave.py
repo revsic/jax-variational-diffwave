@@ -3,7 +3,6 @@ import jax.numpy as jnp
 
 from .config import Config
 from .wavenet import WaveNetBlock
-from .weightnorm import constant
 
 
 class DiffWave(nn.Module):
@@ -23,8 +22,6 @@ class DiffWave(nn.Module):
         self.proj_embed = [
             nn.Dense(config.embedding_proj)
             for _ in range(config.embedding_layers)]
-        self.factor = self.param(
-            'factor', constant(float(config.embedding_factor)), [])
         # mel-upsampler
         self.upsample = [
             nn.ConvTranspose(
@@ -65,7 +62,7 @@ class DiffWave(nn.Module):
         # [B, T, C]
         x = nn.swish(self.proj(x))
         # [B, E']
-        embed = self.embedding(snr, self.factor)
+        embed = self.embedding(snr)
         # [B, E]
         for proj in self.proj_embed:
             embed = nn.swish(proj(embed))
@@ -86,7 +83,7 @@ class DiffWave(nn.Module):
         # [B, T]
         return nn.tanh(self.proj_out(context)).squeeze(-1)
 
-    def embedding(self, snr: jnp.ndarray, factor: jnp.ndarray) -> jnp.ndarray:
+    def embedding(self, snr: jnp.ndarray) -> jnp.ndarray:
         """Generate embedding.
         Args:
             snr: [float32; [B]], unit normalized signal-to-noise ratio.
@@ -98,7 +95,7 @@ class DiffWave(nn.Module):
         # [E // 2]
         denom = jnp.exp(-jnp.log(10000) * i / self.config.embedding_size)
         # [B, E // 2]
-        context = snr[:, None] * denom[None] * factor
+        context = snr[:, None] * denom[None] * self.config.embedding_factor
         # [B, E // 2, 2]
         pe = jnp.stack([jnp.sin(context), jnp.cos(context)], axis=-1)
         # [B, E]
