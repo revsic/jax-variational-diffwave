@@ -142,7 +142,7 @@ class Trainer:
 
                     with self.train_log.as_default():
                         for name, loss in losses.items():
-                            tf.summary.scalar(f'common/{name}', loss.item(), step)
+                            tf.summary.scalar(f'loss/{name}', loss.item(), step)
 
                         tf.summary.scalar('common/grad-norm', grad_norm.item(), step)
 
@@ -190,7 +190,7 @@ class Trainer:
             # test log
             with self.test_log.as_default():
                 for name, loss in losses.items():
-                    tf.summary.scalar(f'common/{name}', np.mean(loss), step)
+                    tf.summary.scalar(f'loss/{name}', np.mean(loss), step)
 
                 gt, pred, ir = self.eval(timesteps)
                 tf.summary.audio(
