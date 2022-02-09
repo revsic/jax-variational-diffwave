@@ -1,5 +1,7 @@
 # jax-variational-diffwave
 
+**WARNING: This repository is pended maintaining, continuous time diffusion was failed.**
+
 Jax/Flax implementation of Variational-DiffWave. (Zhifeng Kong et al., 2020, Diederik P. Kingma et al., 2021.)
 
 - DiffWave with Continuous-time Variational Diffusion Models.
