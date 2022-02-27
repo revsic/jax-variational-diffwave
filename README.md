@@ -29,13 +29,13 @@ To start to train from previous checkpoint, `--load-step` is available.
 python train.py --load-epoch 10 --config ./ckpt/l1.json
 ```
 
-[WIP] To synthesize test set, run `synth.py`.
+[TODO] To synthesize test set, run `synth.py`.
 
 ```sh
 python synth.py
 ```
 
-[WIP] Pretrained checkpoints are relased on releases.
+[TODO] Pretrained checkpoints are relased on releases.
 
 To use pretrained model, download files and unzip it. \
 Checkout git repository to proper commit tags and following is sample script.
